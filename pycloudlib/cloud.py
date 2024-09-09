@@ -137,18 +137,21 @@ class BaseCloud(ABC):
         """
         raise NotImplementedError
 
-    def get_image_id_from_name(self, name: str) -> str:
+    def get_image_id_from_name(
+        self, name: str, exact_match: bool = False
+    ) -> str:
         """
         Get the id of the first image whose name contains the given name.
 
-        The name does not need to be an exact match, just a substring of
-        the image name.
-
         Args:
             name: string, name of the image to search for
+            exact_match: boolean, if True, only match exact image name
 
         Returns:
             string, image ID
+
+        Raises:
+            ImageNotFoundError: if image is not found
         """
         raise NotImplementedError
 

@@ -13,7 +13,7 @@ from ibm_vpc.vpc_v1 import Image, ListImagesEnums
 
 from pycloudlib.cloud import BaseCloud
 from pycloudlib.config import ConfigFile
-from pycloudlib.errors import InvalidTagNameError
+from pycloudlib.errors import ImageNotFoundError, InvalidTagNameError
 from pycloudlib.ibm._util import get_first as _get_first
 from pycloudlib.ibm._util import iter_resources as _iter_resources
 from pycloudlib.ibm._util import wait_until as _wait_until
@@ -210,23 +210,30 @@ class IBM(BaseCloud):
             "IBM Cloud does not contain Ubuntu daily images"
         )
 
-    def get_image_id_from_name(self, name: str) -> str:
+    def get_image_id_from_name(
+        self, name: str, exact_match: bool = False
+    ) -> str:
         """
         Get the id of the first image whose name contains the given name.
 
-        The name does not need to be an exact match, just a substring of
-        the image name.
+        Args:
+            name: string, name of the image to search for
+            exact_match: bool, if True, only return the image if the name
+            is an exact match
 
         Returns:
             string, image ID
+
+        Raises:
+            ImageNotFoundError: if image is not found
         """
         image = _get_first(
             self._client.list_images,
             resource_name="images",
             filter_fn=lambda image: name in image["name"],
         )
-        if image is None:
-            raise IBMException(f"Image not found: {name}")
+        if image is None or (exact_match and image["name"] != name):
+            raise ImageNotFoundError(resource_name=name)
         return image["id"]
 
     def get_instance(

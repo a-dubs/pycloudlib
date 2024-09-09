@@ -4,7 +4,6 @@
 
 import logging
 import sys
-from base64 import b64encode
 
 import pycloudlib
 
@@ -30,21 +29,26 @@ def demo(
         compartment_id=compartment_id,
         vcn_name=vcn_name,
     ) as client:
-        with client.launch(
-            image_id=client.released_image("jammy"),
-            user_data=b64encode(cloud_config.encode()).decode(),
-        ) as instance:
-            instance.wait()
-            print(instance.instance_data)
-            print(instance.ip)
-            instance.execute("cloud-init status --wait --long")
-            print(instance.execute("cat /home/ubuntu/example.txt"))
+        # with client.launch(
+        #     image_id=client.released_image("jammy"),
+        #     user_data=b64encode(cloud_config.encode()).decode(),
+        # ) as instance:
+        #     instance.wait()
+        #     print(instance.instance_data)
+        #     print(instance.ip)
+        #     instance.execute("cloud-init status --wait --long")
+        #     print(instance.execute("cat /home/ubuntu/example.txt"))
 
-            snapshotted_image_id = client.snapshot(instance)
+        #     snapshotted_image_id = client.snapshot(instance)
 
-        with client.launch(image_id=snapshotted_image_id) as new_instance:
-            new_instance.wait()
-            new_instance.execute("whoami")
+        # with client.launch(image_id=snapshotted_image_id) as new_instance:
+        #     new_instance.wait()
+        #     new_instance.execute("whoami")
+        print(
+            client.get_image_id_from_name(
+                "ipv6-variant-1-custom-cloud-init-", exact_match=True
+            )
+        )
 
 
 if __name__ == "__main__":

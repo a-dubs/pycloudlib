@@ -73,6 +73,9 @@ def test_get_image_id_from_name(mock_ibmclassic):
     )
 
 
+# assert that get_image_id_from_name raises an exception if the image is not found
+
+
 def test_get_datacenter(mock_ibmclassic):
     mock_ibmclassic._network_manager.get_list_datacenter.return_value = [
         {"name": "dal11"},

@@ -8,7 +8,7 @@ import SoftLayer  # type: ignore
 
 from pycloudlib.cloud import BaseCloud
 from pycloudlib.config import ConfigFile
-from pycloudlib.errors import InvalidTagNameError
+from pycloudlib.errors import ImageNotFoundError, InvalidTagNameError
 from pycloudlib.ibm_classic.errors import IBMClassicException
 from pycloudlib.ibm_classic.instance import IBMClassicInstance
 from pycloudlib.instance import BaseInstance
@@ -142,26 +142,29 @@ class IBMClassic(BaseCloud):
         """
         raise IBMClassicException("This is not a valid method for IBM Classic")
 
-    def get_image_id_from_name(self, name: str) -> str:
+    def get_image_id_from_name(
+        self, name: str, exact_match: bool = False
+    ) -> str:
         """
         Get the id of the first image whose name contains the given name.
 
-        The name does not need to be an exact match, just a substring of
-        the image name.
-
         Args:
             name: string, name of the image to search for
+            exact_match: boolean, if True, only match exact image name
 
         Returns:
             string, image ID
+
+        Raises:
+            ImageNotFoundError: if image is not found
         """
         private_images_gen = self._image_manager.list_private_images(
-            name=f"*{name}*"
+            name=f"*{name}*" if not exact_match else name
         )
-        private_images = list(private_images_gen)
-        if not private_images:
-            raise IBMClassicException(f"No private images found for {name}")
-        return private_images[0]["globalIdentifier"]
+        images = list(private_images_gen)
+        if not images:
+            raise ImageNotFoundError(resource_name=name)
+        return images[0]["globalIdentifier"]
 
     def get_instance(self, instance_id, **kwargs) -> BaseInstance:
         """Get an instance by id.

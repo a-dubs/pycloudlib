@@ -247,6 +247,36 @@ class EC2(BaseCloud):
         )
         return image["ImageId"]
 
+    def get_image_id_from_name(
+        self, name: str, exact_match: bool = False
+    ) -> str:
+        """
+        Get the id of the first image whose name contains the given name.
+
+        Args:
+            name: string, name of the image to search for
+            exact_match: boolean, if True, only match exact image name
+
+        Returns:
+            string, image ID
+
+        Raises:
+            ImageNotFoundError: if image is not found
+        """
+        filters = [
+            {
+                "Name": "name",
+                "Values": [f"*{name}*"] if not exact_match else [name],
+            }
+        ]
+
+        images = self.client.describe_images(Filters=filters)
+
+        if not images.get("Images"):
+            raise ImageNotFoundError(resource_name=name)
+
+        return images["Images"][0]["ImageId"]
+
     def _find_image_serial(
         self, image_id, image_type: ImageType = ImageType.GENERIC
     ):
@@ -264,7 +294,7 @@ class EC2(BaseCloud):
         )
 
         if not images.get("Images"):
-            raise ImageNotFoundError(image_id)
+            raise ImageNotFoundError(resource_id=image_id)
 
         image_name = images["Images"][0].get("Name", "")
         serial_regex = r"ubuntu/.*/.*/.*-(?P<serial>\d+(\.\d+)?)$"

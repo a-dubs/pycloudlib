@@ -233,6 +233,41 @@ class GCE(BaseCloud):
 
         return image_list
 
+    def get_image_id_from_name(
+        self,
+        name: str,
+        exact_match: bool = False,
+        *,
+        arch: str = "x86_64",
+    ) -> str:
+        """
+        Get the id of the first image whose name contains the given name.
+
+        Args:
+            name: string, name of the image to search for
+            exact_match: boolean, if True, only match exact image name
+
+        Returns:
+            string, image ID
+
+        Raises:
+            ImageNotFoundError: if image is not found
+        """
+        images = self._query_image_list(
+            release="",
+            project=self.project,
+            # name_filter="*name*" if not exact_match else name,  # * wildcard is not supported
+            name_filter=f"{name}" if not exact_match else name,
+            arch=arch,
+        )
+        print(images)
+        if not images:
+            raise ImageNotFoundError(
+                resource_name=name,
+                image_type=ImageType.GENERIC,
+            )
+        return "projects/{}/global/images/{}".format(self.project, images[0]["id"])
+
     def daily_image(
         self,
         release: str,

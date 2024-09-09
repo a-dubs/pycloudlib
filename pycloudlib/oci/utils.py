@@ -5,6 +5,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Dict, Optional
 
+from oci.response import Response  # pylint: disable=E0611,E0401
 from oci.retry import DEFAULT_RETRY_STRATEGY  # pylint: disable=E0611,E0401
 
 from pycloudlib.errors import PycloudlibError
@@ -115,3 +116,37 @@ def get_subnet_id(
             f"Unable to determine subnet id for domain: {availability_domain}"
         )
     return subnet_id
+
+
+def paginate_list_results(client_method, *args, **kwargs):
+    """
+    Generic pagination helper for OCI SDK calls.
+
+    Args:
+        client_method: The OCI client method to call (e.g., compute_client.list_images)
+        args: Positional arguments to pass to the client method.
+        kwargs: Keyword arguments to pass to the client method (e.g., compartment_id, display_name).
+
+    Returns:
+        List of all results from paginated calls.
+    """
+    results = []
+    next_page = None
+
+    while True:
+        # Add pagination parameter (if next_page is not None, include it)
+        if next_page:
+            kwargs["page"] = next_page
+
+        # Call the client method
+        response: Response = client_method(*args, **kwargs)
+
+        # Append the current page's data to results
+        results.extend(response.data)
+
+        # Check if there is a next page
+        next_page = response.next_page
+        if next_page is None:
+            break
+
+    return results

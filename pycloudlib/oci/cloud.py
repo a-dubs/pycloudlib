@@ -14,11 +14,15 @@ from pycloudlib.cloud import BaseCloud
 from pycloudlib.config import ConfigFile
 from pycloudlib.errors import (
     CloudSetupError,
+    ImageNotFoundError,
     InstanceNotFoundError,
-    PycloudlibException,
 )
 from pycloudlib.oci.instance import OciInstance
-from pycloudlib.oci.utils import get_subnet_id, wait_till_ready
+from pycloudlib.oci.utils import (
+    get_subnet_id,
+    paginate_list_results,
+    wait_till_ready,
+)
 from pycloudlib.util import UBUNTU_RELEASE_VERSION_MAP, subp
 
 
@@ -220,26 +224,39 @@ class OCI(BaseCloud):
 
         Returns:
             string, serial of latest image
-
         """
         raise NotImplementedError
 
-    def get_image_id_from_name(self, name: str) -> str:
-        """Get the image id from the name.
+    def get_image_id_from_name(
+        self, name: str, exact_match: bool = False
+    ) -> str:
+        """
+        Get the id of the first image whose name contains the given name.
 
         Args:
-            name: string, name of the image to get the id for
+            name: string, name of the image to search for
+            exact_match: boolean, if True, only match exact image name
 
         Returns:
-            string, id of the image
+            string, image ID
 
+        Raises:
+            ImageNotFoundError: if image is not found
         """
-        image_response = self.compute_client.list_images(
-            self.compartment_id, display_name=name
+        images = paginate_list_results(
+            client_method=self.compute_client.list_images,
+            compartment_id=self.compartment_id,
         )
-        if not image_response.data:
-            raise PycloudlibException(f"Image with name {name} not found")
-        return image_response.data[0].id
+        re_filter = f"^{name}$" if exact_match else name
+        image_matches = [
+            image
+            for image in images
+            if re.match(re_filter, image.display_name)
+        ]
+        if not image_matches:
+            raise ImageNotFoundError(resource_name=name)
+        print(image_matches[0].display_name)
+        return image_matches[0].id
 
     def get_instance(
         self, instance_id, *, username: Optional[str] = None, **kwargs
