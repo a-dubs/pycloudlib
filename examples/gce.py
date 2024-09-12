@@ -6,6 +6,7 @@ import logging
 import os
 
 import pycloudlib
+from pycloudlib import GCE
 from pycloudlib.cloud import ImageType
 
 
@@ -55,15 +56,38 @@ def pro_fips(gce):
         print(inst.execute("sudo ua status --wait"))
 
 
+def custom_image(gce: GCE, image_name):
+    """Show example of running a GCE custom image."""
+    image_id = gce.get_image_id_from_name(image_name)
+    print(image_id)
+    with gce.launch(image_id=image_id) as instance:
+        instance.wait()
+        print(instance.execute("hostname"))
+        input("Press Enter to teardown instance")
+
+def upload_custom_image(gce: GCE, image_name, local_image_path, bucket_name):
+    """Show example of uploading a custom image to GCE."""
+    result = gce.upload_and_register_image(
+        image_name=image_name,
+        path_to_local_image=local_image_path,
+        storage_container_name=bucket_name,
+    )
+    print(result)
+
 def demo():
     """Show examples of launching GCP instances."""
     logging.basicConfig(level=logging.DEBUG)
     with pycloudlib.GCE(tag="examples") as gce:
         manage_ssh_key(gce)
 
-        generic(gce)
-        pro(gce)
-        pro_fips(gce)
+        # custom_image(gce, "noble-gce-test-image")
+
+        upload_custom_image(
+            gce,
+            image_name="noble-gce-test-image-4",
+            local_image_path="/home/a-dubs/.swift/noble-gce.tar.gz",
+            bucket_name="a-dubs-jenkins-bucket",
+        )
 
 
 if __name__ == "__main__":

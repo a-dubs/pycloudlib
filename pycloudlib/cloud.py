@@ -1,6 +1,7 @@
 # This file is part of pycloudlib. See LICENSE file for license information.
 """Base class for all other clouds to provide consistent set of functions."""
 
+import dataclasses
 import enum
 import getpass
 import io
@@ -316,3 +317,26 @@ class BaseCloud(ABC):
 
         if rules_failed:
             raise InvalidTagNameError(tag=tag, rules_failed=rules_failed)
+
+@dataclasses.dataclass
+class ImageInfo:
+    """Basic information about an image."""
+    id: str
+    name: str
+
+def upload_and_register_image(
+    self,
+    path_to_local_image: str,
+    image_name: str,
+    storage_container_name: str,
+) -> ImageInfo:
+    """
+    Uploads given image binary to the cloud and registers it as an image.
+
+    Args:
+        path_to_local_image: The local file path of the image to upload.
+        image_name: The name to upload the image as and to register.
+        storage_container_name: The name of the storage container/bucket
+            where the file should be uploaded.
+    """
+    raise NotImplementedError
