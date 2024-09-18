@@ -10,7 +10,7 @@ from typing import Optional, cast
 
 import oci
 
-from pycloudlib.cloud import BaseCloud
+from pycloudlib.cloud import BaseCloud, NetworkingType
 from pycloudlib.config import ConfigFile
 from pycloudlib.errors import (
     CloudSetupError,
@@ -131,7 +131,8 @@ class OCI(BaseCloud):
         )
         self.region = self.oci_config["region"]
 
-        self.vcn_name = vcn_name
+        self.vcn_name = vcn_name or self.config.get("vcn_name")
+        self._log.info("vcn_name: %s", self.vcn_name)
         self.fault_domain = fault_domain
         self._log.debug("Logging into OCI")
         self.compute_client = oci.core.ComputeClient(self.oci_config)  # noqa: E501
@@ -276,6 +277,7 @@ class OCI(BaseCloud):
         *,
         retry_strategy=None,
         username: Optional[str] = None,
+        networking_type: NetworkingType = NetworkingType.AUTO,
         **kwargs,
     ) -> OciInstance:
         """Launch an instance.
@@ -291,6 +293,7 @@ class OCI(BaseCloud):
             username: username to use when connecting via SSH
             vcn_name: Name of the VCN to use. If not provided, the first VCN
                 found will be used
+            ipv6_only: bool, whether to configure instance for ipv6-only networking
             **kwargs: dictionary of other arguments to pass as
                 LaunchInstanceDetails
 
@@ -308,6 +311,7 @@ class OCI(BaseCloud):
             self.compartment_id,
             self.availability_domain,
             vcn_name=self.vcn_name,
+            networking_type=networking_type,
         )
         metadata = {
             "ssh_authorized_keys": self.key_pair.public_key_content,
@@ -316,6 +320,20 @@ class OCI(BaseCloud):
             metadata["user_data"] = base64.b64encode(
                 user_data.encode("utf8")
             ).decode("ascii")
+
+        vnic_details: Optional[oci.core.models.CreateVnicDetails] = None
+        if networking_type == NetworkingType.IPV6:
+            vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
+                subnet_id=subnet_id,
+                assign_ipv6_ip=True,
+                assign_public_ip=False,  # no public IPv4 for IPv6-only
+            )
+        if networking_type == NetworkingType.DUAL_STACK:
+            vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
+                subnet_id=subnet_id,
+                assign_ipv6_ip=True,
+                assign_public_ip=True,
+            )
 
         instance_details = oci.core.models.LaunchInstanceDetails(  # noqa: E501
             display_name=self.tag,
@@ -326,6 +344,7 @@ class OCI(BaseCloud):
             subnet_id=subnet_id,
             image_id=image_id,
             metadata=metadata,
+            create_vnic_details=vnic_details,
             **kwargs,
         )
 

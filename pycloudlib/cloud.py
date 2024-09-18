@@ -33,6 +33,14 @@ class ImageType(enum.Enum):
     PRO = "Pro"
     PRO_FIPS = "Pro FIPS"
 
+@enum.unique
+class NetworkingType(enum.Enum):
+    """Allowed networking configurations for instances."""
+
+    IPV4 = "ipv4"
+    IPV6 = "ipv6"
+    DUAL_STACK = "dual-stack"
+    AUTO = "auto"
 
 class BaseCloud(ABC):
     """Base Cloud Class."""
