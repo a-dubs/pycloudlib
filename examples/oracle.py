@@ -33,6 +33,7 @@ def demo(
         with client.launch(
             image_id=client.released_image("jammy"),
             user_data=b64encode(cloud_config.encode()).decode(),
+            # ipv6_only=True,
         ) as instance:
             instance.wait()
             print(instance.instance_data)

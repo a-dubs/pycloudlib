@@ -55,6 +55,7 @@ def get_subnet_id(
     compartment_id: str,
     availability_domain: str,
     vcn_name: Optional[str] = None,
+    ipv6_only: bool = False,
     *,
     retry_strategy=DEFAULT_RETRY_STRATEGY,
 ) -> str:
@@ -66,7 +67,8 @@ def get_subnet_id(
     Args:
         network_client: Instance of VirtualNetworkClient.
         compartment_id: Compartment where the subnet has to belong
-        availability_domain: Domain to look for subnet id in.
+        availability_domain: Domain to look for subnet id in, if subnets are
+            AD-specific (not Regional, meaning available region-wide).
         vcn_name: Exact name of the VCN to use. If not provided, the newest
             VCN in the given compartment will be used.
         retry_strategy: A retry strategy to apply to the API calls
@@ -104,10 +106,31 @@ def get_subnet_id(
         if subnet.prohibit_internet_ingress:  # skip subnet if it's private
             log.debug("Ignoring private subnet: %s", subnet.id)
             continue
-        log.debug("Using public subnet: %s", subnet.id)
-        if subnet.availability_domain == availability_domain:
+        if subnet.cidr_block == "<null>" and not ipv6_only:
+            log.debug(
+                "Ignoring public subnet with no ipv4 cidr block because "
+                "ipv6_only is not enabled: (%s)",
+                subnet.id,
+            )
+            continue
+        if ipv6_only and not subnet.cidr_block and subnet.ipv6_cidr_block:
+            log.info("Using ipv6-only subnet: %s", subnet.id)
             subnet_id = subnet.id
             break
+        # https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/Overview_of_VCNs_and_Subnets.htm#Overview__regional_subnet
+        # check if subnet is AD-specific and matches the desired AD
+        if (
+            subnet.availability_domain 
+            and subnet.availability_domain == availability_domain
+        ):
+            log.info("Using AD-Specific public subnet: %s", subnet.id)
+            subnet_id = subnet.id
+            break
+        if not subnet.availability_domain:
+            log.info("Using Regional public subnet: %s", subnet.id)
+            subnet_id = subnet.id
+            break
+        log.debug("Ignoring subnet: %s", subnet.id)
     else:
         subnet_id = subnets[0].id
     if not subnet_id:

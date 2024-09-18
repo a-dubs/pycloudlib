@@ -276,6 +276,7 @@ class OCI(BaseCloud):
         *,
         retry_strategy=None,
         username: Optional[str] = None,
+        ipv6_only: bool = False,
         **kwargs,
     ) -> OciInstance:
         """Launch an instance.
@@ -291,6 +292,7 @@ class OCI(BaseCloud):
             username: username to use when connecting via SSH
             vcn_name: Name of the VCN to use. If not provided, the first VCN
                 found will be used
+            ipv6_only: bool, whether to configure instance for ipv6-only networking
             **kwargs: dictionary of other arguments to pass as
                 LaunchInstanceDetails
 
@@ -317,6 +319,14 @@ class OCI(BaseCloud):
                 user_data.encode("utf8")
             ).decode("ascii")
 
+        vnic_details: Optional[oci.core.models.CreateVnicDetails] = None
+        if ipv6_only:
+            vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
+                subnet_id=subnet_id,
+                assign_ipv6_ip=True,
+                assign_public_ip=False,  # no public IPv4 for IPv6-only
+            )
+
         instance_details = oci.core.models.LaunchInstanceDetails(  # noqa: E501
             display_name=self.tag,
             availability_domain=self.availability_domain,
@@ -326,6 +336,7 @@ class OCI(BaseCloud):
             subnet_id=subnet_id,
             image_id=image_id,
             metadata=metadata,
+            create_vnic_details=vnic_details,
             **kwargs,
         )
 
