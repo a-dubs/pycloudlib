@@ -25,6 +25,14 @@ from pycloudlib.util import (
 _RequiredValues = Optional[Sequence[Optional[Any]]]
 
 
+@dataclasses.dataclass
+class ImageInfo:
+    """Basic information about an image."""
+
+    id: str
+    name: str
+
+
 @enum.unique
 class ImageType(enum.Enum):
     """Allowed image types when launching cloud images."""
@@ -318,25 +326,105 @@ class BaseCloud(ABC):
         if rules_failed:
             raise InvalidTagNameError(tag=tag, rules_failed=rules_failed)
 
-@dataclasses.dataclass
-class ImageInfo:
-    """Basic information about an image."""
-    id: str
-    name: str
+    # def upload_and_register_image(
+    #     self,
+    #     path_to_local_image: str,
+    #     image_name: str,
+    #     storage_container_name: str,
+    # ) -> ImageInfo:
+    #     """
+    #     Uploads given image binary to the cloud and registers it as an image.
 
-def upload_and_register_image(
-    self,
-    path_to_local_image: str,
-    image_name: str,
-    storage_container_name: str,
-) -> ImageInfo:
-    """
-    Uploads given image binary to the cloud and registers it as an image.
+    #     Args:
+    #         path_to_local_image: The local file path of the image to upload.
+    #         image_name: The name to upload the image as and to register.
+    #         storage_container_name: The name of the storage container/bucket
+    #             where the file should be uploaded.
+    #     """
+    #     raise NotImplementedError
 
-    Args:
-        path_to_local_image: The local file path of the image to upload.
-        image_name: The name to upload the image as and to register.
-        storage_container_name: The name of the storage container/bucket
-            where the file should be uploaded.
-    """
-    raise NotImplementedError
+    #
+
+    # def create_image_from_local_file(
+    #     self,
+    #     path_to_local_image_file: str,
+    #     image_name: str,
+    #     storage_container_name: str,
+    # ) -> ImageInfo:
+    #     """
+    #     Uploads an image file to a Google Cloud Storage bucket and registers it as a custom image in GCE.
+
+    #     Args:
+    #         path_to_local_image_file: The local file path of the image to upload.
+    #         image_name: The name to upload the image as and to register.
+    #         storage_container_name: The name of the storage container/bucket
+    #             where the file should be uploaded.
+    #     """
+    #     # Upload the image to GCS
+    #     # create destination file name using image name + image file extension
+    #     destination_file_name = f"{image_name}.tar.gz"
+    #     print(f"Uploading image '{image_name}' to {storage_container_name} at {destination_file_name}")
+    #     gcs_image_path = self.upload_image_to_gcs(
+    #         storage_container_name, path_to_local_image, destination_file_name
+    #     )
+    #     print(f"Image '{image_name}' uploaded successfully to GCS.")
+    #     print(f"Registering custom image in GCE from {gcs_image_path}")
+    #     # Register the custom image from GCS
+    #     return self.register_custom_image(image_name, gcs_image_path)
+
+    # optional - raise NotImplementedError from base class
+    def upload_local_file_to_cloud_storage(
+        self,
+        storage_name,
+        path_to_local_image,
+        destination_file_name,
+    ):
+        """
+        Uploads a file to a storage destination on the Cloud.
+        Args:
+            storage_name: The name of the storage destination on the Cloud to upload the file to.
+            path_to_local_image: The local file path of the image to upload.
+            destination_file_name: The name of the file in the storage destination.
+
+        Returns:
+            str: ???
+        """
+        raise NotImplementedError
+
+    # public api function on clouds
+    @abstractmethod
+    def create_image_from_local_file(
+        self,
+        local_file_path: str,
+        image_name: str,
+        intermediary_storage_name: str,
+    ):
+        """
+        Uploads local image file to intermediary storage on the Cloud and creates a custom image from it.
+
+        Args:
+            local_file_path: The local file path of the image to upload.
+            image_name: The name to upload the image as and to register.
+            intermediary_storage_name: The intermediary storage destination on the Cloud to upload the file to before creating the image.
+        """
+        raise NotImplementedError
+
+    # optional per cloud as necessary to do "registering" of images
+    # optional - raise NotImplementedError from base class
+    def _create_image_from_cloud_storage(
+        self,
+        storage_name,
+        image_name,
+        image_family=None,
+        image_description=None,
+    ) -> ImageInfo:
+        """
+        Registers a custom image in GCE from an image stored in a Google Cloud Storage bucket.
+
+        Args:
+            storage_name: The name of the storage destination on the Cloud to upload the file to.
+            image_name: The name the image will be created with.
+            image_family: The family name of the image.
+            image_description: A description of the image.
+        """
+        raise NotImplementedError

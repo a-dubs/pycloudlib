@@ -65,14 +65,16 @@ def custom_image(gce: GCE, image_name):
         print(instance.execute("hostname"))
         input("Press Enter to teardown instance")
 
+
 def upload_custom_image(gce: GCE, image_name, local_image_path, bucket_name):
     """Show example of uploading a custom image to GCE."""
-    result = gce.upload_and_register_image(
+    result = gce.create_image_from_local_file(
+        local_file_path=local_image_path,
         image_name=image_name,
-        path_to_local_image=local_image_path,
-        storage_container_name=bucket_name,
+        intermediary_storage_name=bucket_name,
     )
     print(result)
+
 
 def demo():
     """Show examples of launching GCP instances."""
@@ -80,11 +82,9 @@ def demo():
     with pycloudlib.GCE(tag="examples") as gce:
         manage_ssh_key(gce)
 
-        # custom_image(gce, "noble-gce-test-image")
-
         upload_custom_image(
             gce,
-            image_name="noble-gce-test-image-4",
+            image_name="noble-gce-test-image-5",
             local_image_path="/home/a-dubs/.swift/noble-gce.tar.gz",
             bucket_name="a-dubs-jenkins-bucket",
         )

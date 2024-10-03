@@ -1273,3 +1273,33 @@ class Azure(BaseCloud):
             except Exception as e:
                 exceptions.append(e)
         return exceptions
+
+    def create_image_from_local_file(
+        local_file_path: str,
+        image_name: str,
+        intermediary_storage_name: str,
+    ):
+        """
+        Uploads local image file to intermediary storage on the Cloud and creates a custom image from it.
+
+        Args:
+            local_file_path: The local file path of the image to upload.
+            image_name: The name to upload the image as and to register.
+            intermediary_storage_name: The intermediary storage destination on the Cloud to upload the file to before creating the image.
+        """
+        """
+        # upload as new image
+        wc -c livecd.ubuntu-cpc.azure.vhd
+        # create disk
+        az disk create -n ci-daily-test -g catred-testing --os-type Linux --upload-type Upload --upload-size-bytes
+        32213303808 --sku standard_lrs --hyper-v-generation V2
+        # allow for writing to disk
+        az disk grant-access -n ci-daily-test -g catred-testing --access-level Write --duration-in-seconds 86400
+        # 
+        azcopy copy "livecd.ubuntu-cpc.azure.vhd"
+        "https://md-impexp-zkscnq0vnbqs.z11.blob.storage.azure.net/f1xvqcqvv1nh/abcd?sv=2018-03-28&sr=b&si=be12094f-7402-4df0-8831-75ab0ae86ce2&sig=Jwkxe6fYe29eYTDJahanf38p%2F7mpwadpNdGrp%2BdqhSk%3D"
+        --blob-type PageBlob
+        # prevent writing to disk now that we are done
+        az disk revoke-access -n ci-daily-test -g catred-testing
+        """
+        pass
