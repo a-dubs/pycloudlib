@@ -60,9 +60,7 @@ def oci_instance():
         # Mock get_instance data
         instance_data_mock = mock.Mock()
         instance_data_mock.id = instance_id
-        instance.compute_client.get_instance.return_value = mock.Mock(
-            data=instance_data_mock
-        )
+        instance.compute_client.get_instance.return_value = mock.Mock(data=instance_data_mock)
 
         yield instance
 
@@ -72,13 +70,8 @@ class TestOciInstanceInit:
 
     def test_init(self, oci_instance):
         """Test instance initialization."""
-        assert (
-            oci_instance.instance_id == "ocid1.instance.oc1..exampleuniqueID"
-        )
-        assert (
-            oci_instance.compartment_id
-            == "ocid1.compartment.oc1..exampleuniqueID"
-        )
+        assert oci_instance.instance_id == "ocid1.instance.oc1..exampleuniqueID"
+        assert oci_instance.compartment_id == "ocid1.compartment.oc1..exampleuniqueID"
         assert oci_instance.availability_domain == "Uocm:PHX-AD-1"
         assert oci_instance.username == "opc"
         assert oci_instance._ip is None
@@ -141,9 +134,7 @@ class TestOciInstanceProperties:
         # Set up mocked instance_data
         instance_data_mock = mock.Mock()
         instance_data_mock.fault_domain = "FAULT-DOMAIN-1"
-        oci_instance.compute_client.get_instance.return_value = mock.Mock(
-            data=instance_data_mock
-        )
+        oci_instance.compute_client.get_instance.return_value = mock.Mock(data=instance_data_mock)
 
         # Initially, _fault_domain should be None
         assert oci_instance._fault_domain is None
@@ -170,16 +161,12 @@ class TestOciInstanceVnicOperations:
             # Mock the behavior of network_client.list_vcns()
             vcn_mock = mock.Mock()
             vcn_mock.id = "vcn-id"
-            oci_instance.network_client.list_vcns.return_value = mock.Mock(
-                data=[vcn_mock]
-            )
+            oci_instance.network_client.list_vcns.return_value = mock.Mock(data=[vcn_mock])
 
             # Mock list_subnets to return an iterable of subnets
             subnet_mock = mock.Mock()
             subnet_mock.id = "subnet-id"
-            oci_instance.network_client.list_subnets.return_value = mock.Mock(
-                data=[subnet_mock]
-            )
+            oci_instance.network_client.list_subnets.return_value = mock.Mock(data=[subnet_mock])
 
             # Mock attach_vnic and get_vnic
             vnic_attachment_mock = mock.Mock()
@@ -196,9 +183,7 @@ class TestOciInstanceVnicOperations:
     @pytest.fixture
     def mock_vnic_pagination(self):
         """Mock oci.pagination.list_call_get_all_results_generator for VNIC attachments."""
-        with mock.patch(
-            "oci.pagination.list_call_get_all_results_generator"
-        ) as mock_pagination:
+        with mock.patch("oci.pagination.list_call_get_all_results_generator") as mock_pagination:
             yield mock_pagination
 
     def test_add_network_interface(self, setup_vnic_mocks):
@@ -210,9 +195,7 @@ class TestOciInstanceVnicOperations:
         assert result == "192.168.1.10"
         oci_instance.compute_client.attach_vnic.assert_called_once()
 
-    def test_remove_network_interface_success(
-        self, oci_instance, mock_vnic_pagination
-    ):
+    def test_remove_network_interface_success(self, oci_instance, mock_vnic_pagination):
         """Test remove_network_interface() method when the VNIC is found and successfully removed."""
         # Mock VNIC attachment list and get_vnic call
         vnic_attachment_mock = mock.Mock()
@@ -223,19 +206,13 @@ class TestOciInstanceVnicOperations:
 
         # Mock the pagination result to return the VNIC attachment
         mock_vnic_pagination.return_value = [vnic_attachment_mock]
-        oci_instance.network_client.get_vnic.return_value = mock.Mock(
-            data=vnic_data_mock
-        )
+        oci_instance.network_client.get_vnic.return_value = mock.Mock(data=vnic_data_mock)
 
         # Call remove_network_interface and check it removes the correct VNIC
         oci_instance.remove_network_interface("192.168.1.10")
-        oci_instance.compute_client.detach_vnic.assert_called_once_with(
-            "attachment-id"
-        )
+        oci_instance.compute_client.detach_vnic.assert_called_once_with("attachment-id")
 
-    def test_remove_network_interface_not_found(
-        self, oci_instance, mock_vnic_pagination
-    ):
+    def test_remove_network_interface_not_found(self, oci_instance, mock_vnic_pagination):
         """Test remove_network_interface() raises an error if the VNIC is not found."""
         # Mock an empty VNIC attachment list
         mock_vnic_pagination.return_value = []
@@ -245,4 +222,3 @@ class TestOciInstanceVnicOperations:
             match="Network interface with ip_address=192.168.1.10 did not detach",
         ):
             oci_instance.remove_network_interface("192.168.1.10")
-

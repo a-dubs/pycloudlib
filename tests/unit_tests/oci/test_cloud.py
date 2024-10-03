@@ -68,9 +68,7 @@ class TestOciInit:
 
     def test_init_invalid_config(self):
         """Test __init__ with invalid OCI configuration."""
-        with mock.patch(
-            "oci.config.from_file", side_effect=oci.exceptions.InvalidConfig
-        ):
+        with mock.patch("oci.config.from_file", side_effect=oci.exceptions.InvalidConfig):
             with pytest.raises(ValueError, match="Config dict is invalid"):
                 OCI(tag="test-instance", config_dict={"invalid": "config"})
 
@@ -81,23 +79,17 @@ class TestOciImages:
     def test_delete_image(self, oci_cloud):
         """Test delete_image method."""
         oci_cloud.delete_image("test-image-id")
-        oci_cloud.compute_client.delete_image.assert_called_once_with(
-            "test-image-id"
-        )
+        oci_cloud.compute_client.delete_image.assert_called_once_with("test-image-id")
 
     def test_released_image(self, oci_cloud):
         """Test released_image calls daily_image."""
-        with mock.patch.object(
-            oci_cloud, "daily_image", return_value="image-id"
-        ):
+        with mock.patch.object(oci_cloud, "daily_image", return_value="image-id"):
             assert oci_cloud.released_image("20.04") == "image-id"
 
     def test_daily_image(self, oci_cloud):
         """Test daily_image method for Ubuntu images."""
         oci_cloud.compute_client.list_images.return_value = mock.Mock(
-            data=[
-                mock.Mock(display_name="Canonical Ubuntu 20.04", id="image-id")
-            ]
+            data=[mock.Mock(display_name="Canonical Ubuntu 20.04", id="image-id")]
         )
         assert oci_cloud.daily_image("20.04") == "image-id"
         oci_cloud.compute_client.list_images.assert_called_once_with(
@@ -131,9 +123,7 @@ class TestOciImages:
     def test_get_image_id_from_name_not_found(self, oci_cloud):
         """Test get_image_id_from_name raises error when no image is found."""
         oci_cloud.compute_client.list_images.return_value = mock.Mock(data=[])
-        with pytest.raises(
-            PycloudlibException, match="Image with name test-image not found"
-        ):
+        with pytest.raises(PycloudlibException, match="Image with name test-image not found"):
             oci_cloud.get_image_id_from_name("test-image")
 
     @mock.patch("pycloudlib.oci.cloud.wait_till_ready")
@@ -169,9 +159,7 @@ class TestOciInstances:
         oci_cloud.compute_client.get_instance.return_value = mock.Mock()
         instance = oci_cloud.get_instance("test-instance-id", username="opc")
         assert isinstance(instance, OciInstance)
-        oci_cloud.compute_client.get_instance.assert_called_once_with(
-            "test-instance-id"
-        )
+        oci_cloud.compute_client.get_instance.assert_called_once_with("test-instance-id")
 
     @mock.patch("oci.config.from_file")
     def test_get_instance_not_found(self, mock_from_file, oci_cloud):
@@ -185,14 +173,12 @@ class TestOciInstances:
         }
         mock_from_file.return_value = valid_config
 
-        oci_cloud.compute_client.get_instance.side_effect = (
-            oci.exceptions.ServiceError(
-                status=404,
-                code="NotFound",
-                message="Instance not found",
-                headers={},
-                target_service=None,
-            )
+        oci_cloud.compute_client.get_instance.side_effect = oci.exceptions.ServiceError(
+            status=404,
+            code="NotFound",
+            message="Instance not found",
+            headers={},
+            target_service=None,
         )
         with pytest.raises(InstanceNotFoundError):
             oci_cloud.get_instance("test-instance-id")
@@ -202,9 +188,7 @@ class TestOciInstances:
         """Test launch method with valid inputs."""
         # mock the key pair
         oci_cloud.key_pair = mock.Mock()
-        oci_cloud.key_pair.public_key_content = (
-            "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC"
-        )
+        oci_cloud.key_pair.public_key_content = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC"
         oci_cloud.compute_client.launch_instance.return_value = mock.Mock(
             data=mock.Mock(id="instance-id")
         )
@@ -212,9 +196,7 @@ class TestOciInstances:
         # mock pycloudlib.oci.utils.get_subnet_id
         with mock.patch("pycloudlib.oci.cloud.get_subnet_id") as m_subnet:
             m_subnet.return_value = "subnet-id"
-            instance = oci_cloud.launch(
-                "test-image-id", instance_type="VM.Standard2.1"
-            )
+            instance = oci_cloud.launch("test-image-id", instance_type="VM.Standard2.1")
         oci_cloud.compute_client.launch_instance.assert_called_once()
         assert instance is not None
         m_subnet.assert_called_once()
