@@ -222,3 +222,245 @@ class TestOciInstanceVnicOperations:
             match="Network interface with ip_address=192.168.1.10 did not detach",
         ):
             oci_instance.remove_network_interface("192.168.1.10")
+
+
+class TestOciInstanceIp:
+    """Tests for the ip property of OciInstance."""
+
+    def setup_mock_vnic(self, oci_instance, vnic_data_list):
+        """
+        Mock VNIC attachments and VNIC data based on custom VNIC configurations.
+
+        Args:
+            vnic_data_list (list): List of tuples containing VNIC data.
+                Each tuple should contain the following elements:
+                - vnic_id_suffix (str): Suffix to create a unique VNIC ID
+                - is_primary (bool): Whether the VNIC is primary
+                - public_ip (str): Public IPv4 address of the VNIC
+                - ipv6_addresses (list): List of IPv6 addresses of the VNIC
+
+        The function sets up the mock behavior of the OCI instance to return the VNIC data
+        based on the vnic configuration provided in vnic_data_list.
+        """
+        vnic_attachments = []
+        vnics_data = {}
+
+        for (
+            vnic_id_suffix,
+            is_primary,
+            public_ip,
+            ipv6_addresses,
+        ) in vnic_data_list:
+            vnic_id = f"ocid1.vnic.oc1..vnicuniqueID{vnic_id_suffix}"
+            # Create VNIC attachment mock
+            vnic_attachment = mock.Mock()
+            vnic_attachment.vnic_id = vnic_id
+            vnic_attachments.append(vnic_attachment)
+
+            # Create VNIC data mock
+            vnic = mock.Mock()
+            vnic.is_primary = is_primary
+            vnic.public_ip = public_ip
+            vnic.ipv6_addresses = ipv6_addresses
+            vnics_data[vnic_id] = mock.Mock(data=vnic)
+
+        oci_instance.compute_client.list_vnic_attachments.return_value = mock.Mock(
+            data=vnic_attachments
+        )
+
+        # Mock get_vnic to return appropriate VNIC data based on vnic_id
+        def get_vnic_side_effect(vnic_id):
+            return vnics_data.get(vnic_id, mock.Mock(data=mock.Mock()))
+
+        oci_instance.network_client.get_vnic.side_effect = get_vnic_side_effect
+
+    @pytest.mark.parametrize(
+        [
+            "primary_has_ipv4",
+            "primary_has_ipv6",
+            "secondary_has_ipv4",
+            "secondary_has_ipv6",
+            "primary_first",
+            "expected_ip",
+            "expect_error",
+        ],
+        [
+            pytest.param(
+                True,  # primary_has_ipv4
+                False,  # primary_has_ipv6
+                False,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                True,  # primary_first
+                "203.0.113.1",  # expected_ip
+                False,  # expect_error
+                id="Primary VNIC has IPv4 (primary first)",
+            ),
+            pytest.param(
+                False,  # primary_has_ipv4
+                True,  # primary_has_ipv6
+                False,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                False,  # primary_first
+                "2001:db8::1",  # expected_ip
+                False,  # expect_error
+                id="Primary VNIC has IPv6 (primary not first)",
+            ),
+            pytest.param(
+                False,  # primary_has_ipv4
+                False,  # primary_has_ipv6
+                True,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                True,  # primary_first
+                None,  # expected_ip
+                True,  # expect_error
+                id="Primary VNIC no IPs, secondary has IPv4 (expect error)",
+            ),
+            pytest.param(
+                False,  # primary_has_ipv4
+                False,  # primary_has_ipv6
+                False,  # secondary_has_ipv4
+                True,  # secondary_has_ipv6
+                False,  # primary_first
+                None,  # expected_ip
+                True,  # expect_error
+                id="Primary VNIC no IPs, secondary has IPv6 (expect error)",
+            ),
+            pytest.param(
+                False,  # primary_has_ipv4
+                True,  # primary_has_ipv6
+                True,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                True,  # primary_first
+                "2001:db8::1",  # expected_ip
+                False,  # expect_error
+                id="Primary IPv6, secondary IPv4",
+            ),
+            pytest.param(
+                True,  # primary_has_ipv4
+                True,  # primary_has_ipv6
+                False,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                True,  # primary_first
+                "203.0.113.1",  # expected_ip
+                False,  # expect_error
+                id="Primary VNIC has both IPv4 and IPv6 (primary first)",
+            ),
+            pytest.param(
+                True,  # primary_has_ipv4
+                True,  # primary_has_ipv6
+                False,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                False,  # primary_first
+                "203.0.113.1",  # expected_ip
+                False,  # expect_error
+                id="Primary VNIC has both IPv4 and IPv6 (primary not first)",
+            ),
+            pytest.param(
+                False,  # primary_has_ipv4
+                False,  # primary_has_ipv6
+                True,  # secondary_has_ipv4
+                True,  # secondary_has_ipv6
+                True,  # primary_first
+                None,  # expected_ip
+                True,  # expect_error
+                id="Primary VNIC no IPs, secondary has both (expect error)",
+            ),
+            pytest.param(
+                True,  # primary_has_ipv4
+                False,  # primary_has_ipv6
+                True,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                False,  # primary_first
+                "203.0.113.1",  # expected_ip
+                False,  # expect_error
+                id="Both VNICs have IPv4 (primary not first)",
+            ),
+            pytest.param(
+                False,  # primary_has_ipv4
+                False,  # primary_has_ipv6
+                False,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                True,  # primary_first
+                None,  # expected_ip
+                True,  # expect_error
+                id="No VNICs have IPs (expect error)",
+            ),
+            pytest.param(
+                False,  # primary_has_ipv4
+                True,  # primary_has_ipv6
+                True,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                False,  # primary_first
+                "2001:db8::1",  # expected_ip
+                False,  # expect_error
+                id="Multiple primary VNICs, primary not first (IPv6)",
+            ),
+            pytest.param(
+                True,  # primary_has_ipv4
+                False,  # primary_has_ipv6
+                False,  # secondary_has_ipv4
+                False,  # secondary_has_ipv6
+                False,  # primary_first
+                "203.0.113.1",  # expected_ip
+                False,  # expect_error
+                id="Primary VNIC has IPv4 (primary not first)",
+            ),
+        ],
+    )
+    def test_oci_instance_ip_parametrized(
+        self,
+        oci_instance,
+        primary_has_ipv4,
+        primary_has_ipv6,
+        secondary_has_ipv4,
+        secondary_has_ipv6,
+        primary_first,
+        expected_ip,
+        expect_error,
+    ):
+        """
+        Test the ip property of OciInstance with various VNIC configurations.
+
+        By testing a matrix of VNIC configurations, this test ensures that the ip property
+        of OciInstance behaves as expected in various scenarios, testing all meaningful
+        combinations of the following conditions:
+        - if the primary VNIC has an IPv4 address
+        - if the primary VNIC has an IPv6 address
+        - if the secondary VNIC has an IPv4 address
+        - if the secondary VNIC has an IPv6 address
+        - if the primary VNIC is listed first
+        """
+        # Prepare VNIC configurations
+        # Primary VNIC configuration
+        primary_vnic = (
+            "1",  # vnic_id_suffix
+            True,  # is_primary
+            "203.0.113.1" if primary_has_ipv4 else None,  # public_ip
+            ["2001:db8::1"] if primary_has_ipv6 else [],  # ipv6_addresses
+        )
+
+        # Secondary VNIC configuration
+        secondary_vnic = (
+            "2",  # vnic_id_suffix
+            False,  # is_primary
+            "203.0.113.2" if secondary_has_ipv4 else None,  # public_ip
+            ["2001:db8::2"] if secondary_has_ipv6 else [],  # ipv6_addresses
+        )
+
+        # Arrange VNICs based on primary_first flag
+        if primary_first:
+            vnics_ordered = [primary_vnic, secondary_vnic]
+        else:
+            vnics_ordered = [secondary_vnic, primary_vnic]
+
+        # Setup mock VNICs
+        self.setup_mock_vnic(oci_instance, vnics_ordered)
+
+        if expect_error:
+            with pytest.raises(
+                PycloudlibError,
+                match="No public ipv4 address or ipv6 address found",
+            ):
+                _ = oci_instance.ip
+        else:
+            assert oci_instance.ip == expected_ip
