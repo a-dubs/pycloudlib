@@ -314,6 +314,79 @@ class OCI(BaseCloud):
         self.created_instances.append(instance)
         return instance
 
+    def launch_cluster(
+        self,
+        image_id: str,
+        cluster_size: int,
+        instance_type: str = "VM.Standard2.1",
+        user_data: Optional[str] = None,
+        *,
+        retry_strategy=None,
+        username: Optional[str] = None,
+        **kwargs,
+    ) -> list[OciInstance]:
+        """Launch a compute cluster.
+
+        Args:
+            image_id: string, image ID to use for the instances
+            cluster_size: int, number of instances to launch
+            instance_type: string, type of instance to create
+            user_data: used by Cloud-Init to run custom scripts or
+                provide custom Cloud-Init configuration
+            retry_strategy: a retry strategy from oci.retry module
+                to apply for this operation
+            username: username to use when connecting via SSH
+            **kwargs: dictionary of other arguments to pass as
+                LaunchInstanceDetails
+
+        Returns:
+            A list of instance objects to use to manipulate the instances further.
+        """
+        if not image_id:
+            raise ValueError(f"{self._type} launch requires image_id param. Found: {image_id}")
+        if cluster_size < 1:
+            raise ValueError("Cluster size must be at least 1")
+
+        instances = []
+        for i in range(cluster_size):
+            instance_tag = f"{self.tag}-{i+1}"
+            subnet_id = get_subnet_id(
+                self.network_client,
+                self.compartment_id,
+                self.availability_domain,
+                vcn_name=self.vcn_name,
+            )
+            metadata = {
+                "ssh_authorized_keys": self.key_pair.public_key_content,
+            }
+            if user_data:
+                metadata["user_data"] = base64.b64encode(user_data.encode("utf8")).decode("ascii")
+
+            instance_details = oci.core.models.LaunchInstanceDetails(
+                display_name=instance_tag,
+                availability_domain=self.availability_domain,
+                compartment_id=self.compartment_id,
+                fault_domain=self.fault_domain,
+                shape=instance_type,
+                subnet_id=subnet_id,
+                image_id=image_id,
+                metadata=metadata,
+                **kwargs,
+            )
+
+            instance_data = self.compute_client.launch_instance(
+                instance_details, retry_strategy=retry_strategy
+            ).data
+            instance = self.get_instance(
+                instance_data.id,
+                retry_strategy=retry_strategy,
+                username=username,
+            )
+            self.created_instances.append(instance)
+            instances.append(instance)
+
+        return instances
+
     def snapshot(self, instance, clean=True, name=None):
         """Snapshot an instance and generate an image from it.
 
