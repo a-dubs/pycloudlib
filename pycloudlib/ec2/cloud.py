@@ -330,6 +330,7 @@ class EC2(BaseCloud):
         disk_size_gb: int = 15,
         username: Optional[str] = None,
         enable_ipv6: bool = False,
+        enable_hibernation: bool = False,
         **kwargs,
     ):
         """Launch instance on EC2.
@@ -343,6 +344,7 @@ class EC2(BaseCloud):
             username: username to use when connecting via SSH
             enable_ipv6: indicates if ipv6 IMDS support must be added to the
                 instance
+            enable_hibernation: indicates if hibernation should be enabled for the instance
             kwargs: other named arguments to add to instance JSON
 
         Returns:
@@ -375,6 +377,11 @@ class EC2(BaseCloud):
                 }
             ],
         }
+
+        if enable_hibernation:
+            args["HibernationOptions"] = {"Configured": True}
+            # make ebs configuration encrypted since this is required for hibernation
+            args["BlockDeviceMappings"][0]["Ebs"]["Encrypted"] = True
 
         if user_data:
             args["UserData"] = user_data

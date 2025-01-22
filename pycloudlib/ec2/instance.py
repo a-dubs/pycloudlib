@@ -6,10 +6,13 @@ import time
 from typing import Dict, List, Optional
 
 import botocore
+from botocore.client import BaseClient
 
 from pycloudlib.errors import PycloudlibError
 from pycloudlib.instance import BaseInstance
-
+from mypy_boto3_ec2.client import EC2Client 
+from mypy_boto3_ec2.type_defs import StopInstancesResultTypeDef
+from botocore.exceptions import ClientError
 
 class EC2Instance(BaseInstance):
     """EC2 backed instance."""
@@ -30,7 +33,7 @@ class EC2Instance(BaseInstance):
 
         self._instance = instance
         self._ip = None
-        self._client = client
+        self._client: EC2Client = client
 
         self.boot_timeout = 300
 
@@ -526,6 +529,69 @@ class EC2Instance(BaseInstance):
                 "Failed manually deleting network interface. "
                 "Interface should get destroyed on instance cleanup."
             )
+
+    # from different project as a starting  point:
+    # def hibernate_resume(self):
+    #     LOGGER.info('Starting hibernate-resume of EC2 instance "{}"...'.format(self.instance_id))
+    #     instance_id = self.instance.instance_id
+
+    #     LOGGER.info(
+    #         "Waiting {} seconds (required by AWS) before triggering hibernation".format(HIBERNATION_MINIMAL_UPTIME)
+    #     )
+    #     time.sleep(HIBERNATION_MINIMAL_UPTIME)
+
+    #     assert self.interactions.run_command("cp -f /proc/uptime /tmp/uptime-before-hibernate").exited == 0
+
+    #     # hibernate
+    #     LOGGER.info("Making Hibernate API Call")
+    #     self.cloud.ec2_resource.Instance(instance_id).stop(Hibernate=True)
+    #     # wait
+    #     self._wait_until_stopped()
+    #     LOGGER.info("Instance stopped")
+    #     # resume, accounting for possibe InsufficientInstanceCapacity exception
+    #     # in AWS infrastructure
+    #     LOGGER.info("Resuming instance")
+    #     self.start_instance_with_retry(instance_id)
+    #     # wait
+    #     self.wait_until_ready()
+
+    def hibernate(self):
+        """Hibernate the instance."""
+        HIBERNATION_MINIMAL_UPTIME = 120
+        self._log.info('Starting hibernate of EC2 instance "{}"...'.format(self.id))
+        self._log.info(
+            "Waiting {} seconds (required by AWS) before triggering hibernation".format(
+                HIBERNATION_MINIMAL_UPTIME
+            )
+        )
+        time.sleep(HIBERNATION_MINIMAL_UPTIME)
+
+        r = self.execute("cp -f /proc/uptime /tmp/uptime-before-hibernate")
+        self._log.debug(r.stdout)
+        self._log.debug(r.stderr)
+        self._log.debug(r.return_code)
+            # self._log.error(
+            #     "Failed to copy /proc/uptime to /tmp/uptime-before-hibernate. "
+            #     "Hibernation might not work???"
+            # )
+
+        try:
+            response: StopInstancesResultTypeDef = self._client.stop_instances(
+                InstanceIds=[self.id],
+                Hibernate=True
+            )
+            print(f"Successfully triggered hibernation for instance: {self.id}")
+            print("Response:", response)
+        except ClientError as error:
+            print(f"Error hibernating instance {self.id}: {error}")
+            raise PycloudlibError(f"Error hibernating instance {self.id}: {error}")
+
+        self.wait_for_stop()
+        self._log.info("Instance stopped")
+        self._log.info("Resuming instance")
+        self.start()
+        self.wait()
+        self._log.info("Instance resumed!")
 
 
 def _check_response(resp):
