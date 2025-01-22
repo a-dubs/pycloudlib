@@ -7,6 +7,7 @@ import os
 
 import pycloudlib
 from pycloudlib.cloud import ImageType
+from pycloudlib.ec2.cloud import EC2
 
 
 def hot_add(ec2, daily):
@@ -71,26 +72,30 @@ def custom_vpc(ec2, daily):
     vpc.delete()
 
 
-def launch_basic(ec2, daily):
+def launch_basic(ec2: EC2, daily):
     """Show basic functionality on instances.
 
     Simple launching of an instance, run a command, and delete.
     """
-    with ec2.launch(daily) as instance:
+    with ec2.launch(
+        image_id=daily,
+        enable_hibernation=True,
+    ) as instance:
         instance.wait()
         instance.console_log()
         print(instance.execute("lsb_release -a"))
-
-        instance.shutdown()
-        instance.start()
-        instance.restart()
 
         # Various Attributes
         print(instance.ip)
         print(instance.id)
         print(instance.image_id)
         print(instance.availability_zone)
+        print(instance.execute("uptime"))
 
+        instance.hibernate()
+        # make sure we can still access the instance after hibernation
+        print(instance.execute("lsb_release -a"))
+        print(instance.execute("uptime"))
 
 def launch_pro(ec2, daily):
     """Show basic functionality on PRO instances."""
@@ -136,23 +141,25 @@ def demo():
     Connects to EC2 and finds the latest daily image. Then runs
     through a number of examples.
     """
-    with pycloudlib.EC2(tag="examples") as ec2:
+    with pycloudlib.EC2(tag="a-dubs-test") as ec2:
         key_name = "test-ec2"
         handle_ssh_key(ec2, key_name)
 
-        daily = ec2.daily_image(release="bionic")
-        daily_pro = ec2.daily_image(release="bionic", image_type=ImageType.PRO)
-        daily_pro_fips = ec2.daily_image(release="bionic", image_type=ImageType.PRO_FIPS)
+        daily = ec2.daily_image(release="noble")
+        # daily_pro = ec2.daily_image(release="noble", image_type=ImageType.PRO)
+        # daily_pro_fips = ec2.daily_image(release="noble", image_type=ImageType.PRO_FIPS)
 
         launch_basic(ec2, daily)
-        launch_pro(ec2, daily_pro)
-        launch_pro_fips(ec2, daily_pro_fips)
-        custom_vpc(ec2, daily)
-        snapshot(ec2, daily)
-        launch_multiple(ec2, daily)
-        hot_add(ec2, daily)
+        # launch_pro(ec2, daily_pro)
+        # launch_pro_fips(ec2, daily_pro_fips)
+        # custom_vpc(ec2, daily)
+        # snapshot(ec2, daily)
+        # launch_multiple(ec2, daily)
+        # hot_add(ec2, daily)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
+    # silence botocore debug logging spam
+    logging.getLogger("botocore").setLevel(logging.INFO)
     demo()
