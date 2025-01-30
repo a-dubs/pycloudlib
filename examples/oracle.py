@@ -7,6 +7,7 @@ import sys
 from base64 import b64encode
 
 import pycloudlib
+from pycloudlib.cloud import NetworkingType
 
 cloud_config = """#cloud-config
 runcmd:
@@ -24,27 +25,25 @@ def demo(
     Connects to OCI and launches released image. Then runs
     through a number of examples.
     """
-    with pycloudlib.OCI(
+    client = pycloudlib.OCI(
         "oracle-test",
         availability_domain=availability_domain,
         compartment_id=compartment_id,
         vcn_name=vcn_name,
-    ) as client:
-        with client.launch(
-            image_id=client.released_image("jammy"),
-            user_data=b64encode(cloud_config.encode()).decode(),
-        ) as instance:
-            instance.wait()
-            print(instance.instance_data)
-            print(instance.ip)
-            instance.execute("cloud-init status --wait --long")
-            print(instance.execute("cat /home/ubuntu/example.txt"))
+    )
+    instance = client.launch(
+        image_id=client.get_image_id_from_name("noble-ipv6-with-cloud-init-df6638633"),
+        # user_data=b64encode(cloud_config.encode()).decode(),
+        networking_type=NetworkingType.IPV6,
+    )
+    instance.wait()
+    print(instance.instance_data)
+    print(instance.ip)
+    instance.execute("cloud-init status --wait --long")
+    print(instance.execute("cat /var/log/cloud-init.log"))
+    print(instance.execute("cat /var/log/cloud-init-output.log"))
 
-            snapshotted_image_id = client.snapshot(instance)
-
-        with client.launch(image_id=snapshotted_image_id) as new_instance:
-            new_instance.wait()
-            new_instance.execute("whoami")
+    print(instance.execute("/etc/default/grub.d/50-cloudimg-settings.cfg"))
 
 
 if __name__ == "__main__":

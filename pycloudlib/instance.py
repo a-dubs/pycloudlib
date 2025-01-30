@@ -2,6 +2,7 @@
 # pylint: disable=too-many-public-methods
 """Base class for all instances to provide consistent set of functions."""
 
+import enum
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -21,6 +22,20 @@ from pycloudlib.errors import CleanupError, PycloudlibTimeoutError
 from pycloudlib.result import Result
 from pycloudlib.util import log_exception_list, shell_pack, shell_quote
 
+
+# S0: The active, working state. 
+# S1 (Standby): Low wake latency state, maintaining most system context, including CPU state. 
+# S2: Similar to S1 but may lose some system context. 
+# S3 (Suspend to RAM): Deep sleep state where system context is saved in RAM, resulting in faster wake-up but potential loss of CPU cache context. 
+# S4 (Hibernate): Lowest power state, saving system context to disk before entering sleep, leading to longer wake-up time. 
+# S5 (Soft Off): Essentially a full system shutdown with no context preserved
+# Force suspend: ????
+
+# make enum for suspend types
+class SuspendType(enum.Enum):
+    HIBERNATE = "hibernate"
+    SUSPEND = "suspend"
+    FORCE_SUSPEND = "force_suspend"
 
 class BaseInstance(ABC):
     """Base instance object."""
@@ -468,6 +483,12 @@ class BaseInstance(ABC):
         self._ssh_client = client
         return client
 
+    def hibernate(self, wait=True):
+        pass
+
+    def suspend(self):
+        pass
+    
     def _sftp_connect(self):
         """Connect to instance via SFTP."""
         if self._sftp_client and self._sftp_client.get_channel().get_transport().is_active():

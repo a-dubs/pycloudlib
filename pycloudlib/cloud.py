@@ -37,6 +37,14 @@ class ImageType(enum.Enum):
     PRO = "Pro"
     PRO_FIPS = "Pro FIPS"
 
+@enum.unique
+class NetworkingType(enum.Enum):
+    """Allowed networking configurations for instances."""
+
+    IPV4 = "ipv4"
+    IPV6 = "ipv6"
+    DUAL_STACK = "dual-stack"
+    AUTO = "auto"
 
 class BaseCloud(ABC):
     """Base Cloud Class."""
@@ -171,6 +179,8 @@ class BaseCloud(ABC):
         image_id: str,
         instance_type=None,
         user_data=None,
+        primary_network_type: NetworkingType = NetworkingType.AUTO,
+        other_network_attachments: Optional[Sequence[NetworkingType]] = None,
         **kwargs,
     ) -> BaseInstance:
         """Launch an instance.
