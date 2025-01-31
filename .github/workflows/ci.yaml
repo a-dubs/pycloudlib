@@ -49,7 +49,9 @@ jobs:
       - name: Setup LXD
         uses: canonical/setup-lxd@v0.1.2
       - name: Run CI integration tests
-        run: tox -e integration-tests-ci
+        run: |
+          ls -l /home/runner/.config/pycloudlib.toml
+          PYCLOUDLIB_CONFIG="/home/runner/.config/pycloudlib.toml" tox -e integration-tests-ci
         # run: tox -e integration-tests-ci -- --color=yes
         # run: |
           # PYCLOUDLIB_CONFIG="${HOME}/.config/pycloudlib.toml"
