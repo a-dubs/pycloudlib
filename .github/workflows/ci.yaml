@@ -47,10 +47,11 @@ jobs:
         uses: actions/checkout@v3
       - name: Setup LXD
         uses: canonical/setup-lxd@v0.1.2
-      - name: Create pycloudlib config file
+      - name: Setup pycloudlib config and ssh key
         run: |
-            mkdir -p ~/.config
-            echo "[lxd]" > ~/.config/pycloudlib.toml
+          ssh-keygen -P "" -q -f ~/.ssh/id_rsa
+          mkdir -p ~/.config
+          echo "[lxd]" > ~/.config/pycloudlib.toml
       - name: Run CI integration tests
         run: |
           ls -l /home/runner/.config/pycloudlib.toml
