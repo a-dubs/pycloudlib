@@ -36,8 +36,7 @@ jobs:
       # - name: Initialize LXD
       #   run: |
       #     ssh-keygen -P "" -q -f ~/.ssh/id_rsa
-      #     mkdir -p ~/.config
-      #     echo "[lxd]" > ~/.config/pycloudlib.toml
+
       #     sudo adduser $USER lxd
       #     # Jammy GH Action runners have docker installed, which edits iptables
       #     # in a way that is incompatible with lxd.
@@ -48,10 +47,15 @@ jobs:
         uses: actions/checkout@v3
       - name: Setup LXD
         uses: canonical/setup-lxd@v0.1.2
+      - name: Create pycloudlib config file
+        run: |
+            mkdir -p ~/.config
+            echo "[lxd]" > ~/.config/pycloudlib.toml
       - name: Run CI integration tests
         run: |
           ls -l /home/runner/.config/pycloudlib.toml
-          PYCLOUDLIB_CONFIG="/home/runner/.config/pycloudlib.toml" tox -e integration-tests-ci
+          tox -e integration-tests-ci
+        # PYCLOUDLIB_CONFIG="/home/runner/.config/pycloudlib.toml" tox -e integration-tests-ci
         # run: tox -e integration-tests-ci -- --color=yes
         # run: |
           # PYCLOUDLIB_CONFIG="${HOME}/.config/pycloudlib.toml"
