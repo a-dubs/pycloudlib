@@ -47,4 +47,8 @@ jobs:
       - name: Git checkout
         uses: actions/checkout@v3
       - name: Run CI integration tests
-        run: sg lxd -c 'tox -e integration-tests-ci'
+        run: |
+          PYCLOUDLIB_CONFIG="${HOME}/.config/pycloudlib.toml"
+          echo "Setting pycloudlib config path to ${PYCLOUDLIB_CONFIG}"
+          export PYCLOUDLIB_CONFIG
+          sudo tox -e integration-tests-ci
