@@ -73,6 +73,12 @@ class BaseInstance(ABC):
     def id(self) -> str:
         """Return instance id."""
         raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def private_ip(self) -> str:
+        """Return instance private ip."""
+        raise NotImplementedError
 
     @property
     @abstractmethod
