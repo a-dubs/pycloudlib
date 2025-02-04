@@ -40,11 +40,11 @@ def demo(
             instance.execute("cloud-init status --wait --long")
             print(instance.execute("cat /home/ubuntu/example.txt"))
 
-            snapshotted_image_id = client.snapshot(instance)
+        #     snapshotted_image_id = client.snapshot(instance)
 
-        with client.launch(image_id=snapshotted_image_id) as new_instance:
-            new_instance.wait()
-            new_instance.execute("whoami")
+        # with client.launch(image_id=snapshotted_image_id) as new_instance:
+        #     new_instance.wait()
+        #     new_instance.execute("whoami")
 
 
 if __name__ == "__main__":
