@@ -4,26 +4,51 @@ on:
   push:
     branches:
       - main
+      - adding-main-check-ci-failures-notification
 
 jobs:
   post-merge-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -qy distro-info tox
-          sudo apt-get remove --yes --purge azure-cli
-      - name: Initialize Pycloudlib
-        env:
-          GCE_CREDENTIALS_JSON: ${{ secrets.GCE_CREDENTIALS_JSON }}
-          PYCLOUDLIB_TOML: ${{ secrets.PYCLOUDLIB_TOML }}
-        run: |
-          ssh-keygen -P "" -q -f ~/.ssh/cloudinit_id_rsa
-          mkdir -p ~/.config
-          echo "$GCE_CREDENTIALS_JSON" > ~/.config/gce_credentials
-          echo "$PYCLOUDLIB_TOML" > ~/.config/pycloudlib.toml
+      # - name: Install dependencies
+      #   run: |
+      #     sudo apt-get update -q
+      #     sudo apt-get install -qy distro-info tox
+      #     sudo apt-get remove --yes --purge azure-cli
+      # - name: Initialize Pycloudlib
+      #   env:
+      #     GCE_CREDENTIALS_JSON: ${{ secrets.GCE_CREDENTIALS_JSON }}
+      #     PYCLOUDLIB_TOML: ${{ secrets.PYCLOUDLIB_TOML }}
+      #   run: |
+      #     ssh-keygen -P "" -q -f ~/.ssh/cloudinit_id_rsa
+      #     mkdir -p ~/.config
+      #     echo "$GCE_CREDENTIALS_JSON" > ~/.config/gce_credentials
+      #     echo "$PYCLOUDLIB_TOML" > ~/.config/pycloudlib.toml
       - name: Git checkout
         uses: actions/checkout@v3
-      - name: Run CI integration tests
-        run: GOOGLE_APPLICATION_CREDENTIALS=~/.config/gce_credentials tox -e integration-tests-main-check
+      #- name: Run CI integration tests
+      #  run: GOOGLE_APPLICATION_CREDENTIALS=~/.config/gce_credentials tox -e integration-tests-main-check
+      
+      # do thing that will intentionally fail to test failure notification
+      - name: Fail the job
+        run: exit 1
+  notify-on-failure:
+    needs: post-merge-tests
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - name: Copy issue body to /tmp
+        run: cp .github/main-check-issue.md /tmp/issue-body.md
+      - name: Add job run link to issue body
+        run: 'echo "\nJob run link: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/issue-body.md'
+      - name: Inspect the issue body
+        run: cat /tmp/issue-body.md
+      - name: Create GitHub issue on failure
+        uses: peter-evans/create-issue-from-file@v5.0.1
+        with:
+          title: 'Post-Merge Main Check CI failed.' 
+          content-filepath: /tmp/issue-body.md
+          labels: bug
+          assignees: a-dubs
