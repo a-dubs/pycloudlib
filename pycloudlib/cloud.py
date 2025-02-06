@@ -46,6 +46,15 @@ class NetworkingType(enum.Enum):
     DUAL_STACK = "dual-stack"
     AUTO = "auto"
 
+from dataclasses import dataclass
+
+@dataclass
+class NetworkingConfig:
+    """Data class for networking configuration."""
+
+    networking_type: NetworkingType
+    private: bool = False
+
 class BaseCloud(ABC):
     """Base Cloud Class."""
 

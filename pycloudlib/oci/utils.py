@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Dict, Optional
 from oci.retry import DEFAULT_RETRY_STRATEGY  # pylint: disable=E0611,E0401
 
 from pycloudlib.errors import PycloudlibError, PycloudlibTimeoutError
-from pycloudlib.cloud import NetworkingType
+from pycloudlib.cloud import NetworkingType, NetworkingConfig
 
 if TYPE_CHECKING:
     import oci
@@ -58,7 +58,7 @@ def get_subnet_id(
     compartment_id: str,
     availability_domain: str,
     vcn_name: Optional[str] = None,
-    networking_type: Optional[NetworkingType] = None,
+    networking_config: Optional[NetworkingConfig] = None,
     *,
     retry_strategy=DEFAULT_RETRY_STRATEGY,
 ) -> str:
@@ -102,28 +102,11 @@ def get_subnet_id(
     ).data
     subnet_id = None
     for subnet in subnets:
-        if subnet.prohibit_internet_ingress:  # skip subnet if it's private
-            log.debug("Ignoring private subnet: %s", subnet.id)
-            continue
-        # if subnet.cidr_block == "<null>" and networking_type != NetworkingType.IPV6:
-        #     log.debug(
-        #         "Ignoring public subnet with no ipv4 cidr block because "
-        #         "ipv6_only is not enabled: (%s)",
-        #         subnet.id,
-        #     )
-        #     continue
-        # if (
-        #     networking_type == NetworkingType.IPV6
-        #     and not subnet.cidr_block
-        #     and subnet.ipv6_cidr_block
-        # ):
-        #     log.info("Using ipv6-only subnet: %s", subnet.id)
-        #     subnet_id = subnet.id
-        #     break
         log.info(subnet)
     
         subnet_networking_is_compatible = False
-
+        networking_type = networking_config.networking_type
+        need_private_subnet = networking_config.private
         # if we need ipv4 
         if (
             networking_type == NetworkingType.IPV4
@@ -151,6 +134,14 @@ def get_subnet_id(
             log.info("found dualstack subnet: %s", subnet.id)
             subnet_networking_is_compatible = True
 
+        # if we need private subnet, check if subnet is private
+        if need_private_subnet:
+            subnet_networking_is_compatible &= subnet.prohibit_internet_ingress
+        
+        # if we need public subnet, check if subnet is not private
+        if not need_private_subnet:
+            subnet_networking_is_compatible &= not subnet.prohibit_internet_ingress
+
         # https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/Overview_of_VCNs_and_Subnets.htm#Overview__regional_subnet
         # check if subnet is AD-specific and matches the desired AD
         if (
@@ -158,16 +149,14 @@ def get_subnet_id(
             and subnet.availability_domain == availability_domain
             and subnet_networking_is_compatible
         ):
-            log.info("Using AD-Specific public subnet: %s", subnet.id)
+            log.info("Using AD-Specific public subnet: %s [id: %s]", subnet.display_name, subnet.id)
             subnet_id = subnet.id
             break
         if not subnet.availability_domain and subnet_networking_is_compatible:
-            log.info("Using Regional public subnet: %s", subnet.id)
+            log.info("Using Regional public subnet: %s [id: %s]", subnet.display_name, subnet.id)
             subnet_id = subnet.id
             break
         log.debug("Ignoring subnet: %s", subnet.id)
-    else:
-        subnet_id = subnets[0].id
     if not subnet_id:
         raise PycloudlibError(f"Unable to determine subnet id for domain: {availability_domain}")
     return subnet_id

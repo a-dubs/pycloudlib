@@ -10,7 +10,7 @@ from typing import Optional, cast
 
 import oci
 
-from pycloudlib.cloud import BaseCloud, NetworkingType
+from pycloudlib.cloud import BaseCloud, NetworkingConfig, NetworkingType
 from pycloudlib.config import ConfigFile
 from pycloudlib.errors import (
     CloudSetupError,
@@ -255,7 +255,7 @@ class OCI(BaseCloud):
         *,
         retry_strategy=None,
         username: Optional[str] = None,
-        networking_type: NetworkingType = NetworkingType.AUTO,
+        primary_network_config: Optional[NetworkingConfig] = None,
         **kwargs,
     ) -> OciInstance:
         """Launch an instance.
@@ -286,22 +286,22 @@ class OCI(BaseCloud):
             self.compartment_id,
             self.availability_domain,
             vcn_name=self.vcn_name,
-            networking_type=networking_type,
+            networking_config=primary_network_config,
         )
         metadata = {
             "ssh_authorized_keys": self.key_pair.public_key_content,
         }
         if user_data:
             metadata["user_data"] = base64.b64encode(user_data.encode("utf8")).decode("ascii")
-
+            
         vnic_details: Optional[oci.core.models.CreateVnicDetails] = None
-        if networking_type == NetworkingType.IPV6:
+        if primary_network_config.networking_type == NetworkingType.IPV6:
             vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
                 subnet_id=subnet_id,
                 assign_ipv6_ip=True,
                 assign_public_ip=False,  # no public IPv4 for IPv6-only
             )
-        if networking_type == NetworkingType.DUAL_STACK:
+        if primary_network_config.networking_type == NetworkingType.DUAL_STACK:
             vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
                 subnet_id=subnet_id,
                 assign_ipv6_ip=True,
@@ -331,6 +331,28 @@ class OCI(BaseCloud):
         )
         self.created_instances.append(instance)
         return instance
+    
+    def find_compatible_subnet(self, networking_config: NetworkingConfig) -> str:
+        """
+        Find a subnet that is compatible with the networking_config.
+
+        Args:
+            networking_config: NetworkingConfig object to use for finding a subnet
+
+        Returns:
+            id of the subnet selected
+        Raises:
+            `Exception` if unable to determine `subnet_id` for
+            `availability_domain`
+        """
+        subnet_id = get_subnet_id(
+            self.network_client,
+            self.compartment_id,
+            self.availability_domain,
+            vcn_name=self.vcn_name,
+            networking_config=networking_config,
+        )
+        return subnet_id
 
     def snapshot(self, instance, clean=True, name=None):
         """Snapshot an instance and generate an image from it.

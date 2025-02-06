@@ -75,7 +75,6 @@ class BaseInstance(ABC):
         raise NotImplementedError
     
     @property
-    @abstractmethod
     def private_ip(self) -> str:
         """Return instance private ip."""
         raise NotImplementedError
