@@ -105,34 +105,38 @@ def get_subnet_id(
         log.info(subnet)
     
         subnet_networking_is_compatible = False
-        networking_type = networking_config.networking_type
-        need_private_subnet = networking_config.private
-        # if we need ipv4 
-        if (
-            networking_type == NetworkingType.IPV4
-            and subnet.cidr_block != "<null>"
-            # and not subnet.ipv6_cidr_block
-        ):
-            log.info("found subnet with ipv4 cidr: %s", subnet.id)
+        if not networking_config:
             subnet_networking_is_compatible = True
+            need_private_subnet = False
+        else:
+            networking_type = networking_config.networking_type
+            need_private_subnet = networking_config.private
+            # if we need ipv4 
+            if (
+                networking_type == NetworkingType.IPV4
+                and subnet.cidr_block != "<null>"
+                # and not subnet.ipv6_cidr_block
+            ):
+                log.info("found subnet with ipv4 cidr: %s", subnet.id)
+                subnet_networking_is_compatible = True
 
-        # if we need ipv6
-        if (
-            networking_type == NetworkingType.IPV6
-            and subnet.cidr_block == "<null>"
-            and subnet.ipv6_cidr_block
-        ):
-            log.info("found subnet with ipv6 cidr: %s", subnet.id)
-            subnet_networking_is_compatible = True
-        
-        # if we need dualstack
-        if (
-            networking_type == NetworkingType.DUAL_STACK
-            and subnet.cidr_block != "<null>"
-            and subnet.ipv6_cidr_block
-        ):
-            log.info("found dualstack subnet: %s", subnet.id)
-            subnet_networking_is_compatible = True
+            # if we need ipv6
+            if (
+                networking_type == NetworkingType.IPV6
+                and subnet.cidr_block == "<null>"
+                and subnet.ipv6_cidr_block
+            ):
+                log.info("found subnet with ipv6 cidr: %s", subnet.id)
+                subnet_networking_is_compatible = True
+            
+            # if we need dualstack
+            if (
+                networking_type == NetworkingType.DUAL_STACK
+                and subnet.cidr_block != "<null>"
+                and subnet.ipv6_cidr_block
+            ):
+                log.info("found dualstack subnet: %s", subnet.id)
+                subnet_networking_is_compatible = True
 
         # if we need private subnet, check if subnet is private
         if need_private_subnet:

@@ -271,7 +271,8 @@ class OCI(BaseCloud):
             username: username to use when connecting via SSH
             vcn_name: Name of the VCN to use. If not provided, the first VCN
                 found will be used
-            ipv6_only: bool, whether to configure instance for ipv6-only networking
+            primary_network_config: NetworkingConfig object to use for configuring the primary
+                network interface
             **kwargs: dictionary of other arguments to pass as
                 LaunchInstanceDetails
 
@@ -295,18 +296,19 @@ class OCI(BaseCloud):
             metadata["user_data"] = base64.b64encode(user_data.encode("utf8")).decode("ascii")
             
         vnic_details: Optional[oci.core.models.CreateVnicDetails] = None
-        if primary_network_config.networking_type == NetworkingType.IPV6:
-            vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
-                subnet_id=subnet_id,
-                assign_ipv6_ip=True,
-                assign_public_ip=False,  # no public IPv4 for IPv6-only
-            )
-        if primary_network_config.networking_type == NetworkingType.DUAL_STACK:
-            vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
-                subnet_id=subnet_id,
-                assign_ipv6_ip=True,
-                assign_public_ip=True,
-            )
+        if primary_network_config:
+            if primary_network_config.networking_type == NetworkingType.IPV6:
+                vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
+                    subnet_id=subnet_id,
+                    assign_ipv6_ip=True,
+                    assign_public_ip=False,  # no public IPv4 for IPv6-only
+                )
+            if primary_network_config.networking_type == NetworkingType.DUAL_STACK:
+                vnic_details = oci.core.models.CreateVnicDetails(  # noqa: E501
+                    subnet_id=subnet_id,
+                    assign_ipv6_ip=True,
+                    assign_public_ip=True,
+                )
 
         instance_details = oci.core.models.LaunchInstanceDetails(  # noqa: E501
             display_name=self.tag,
