@@ -113,7 +113,7 @@ class TestOracleClusterMofed:
                 subnet_name="private subnet-mofed-vcn", # use the private subnet for mofed testing
             )
             time.sleep(30) # wait for the secondary vnic to be attached
-            instance.configure_secondary_vnic(instance)
+            instance.configure_secondary_vnic()
             setup_mofed_iptables_rules(instance)
             
         yield cluster
