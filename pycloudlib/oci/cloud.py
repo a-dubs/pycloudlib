@@ -375,31 +375,30 @@ class OCI(BaseCloud):
     # then launches X number of BM instances and attaches them to the cluster at launch
     # then returns an iterable of the instance objects that were created
     def create_compute_cluster(
-            self,
-            image_id: str,
-            instance_count: int = 2,
-            instance_type: str = "BM.Optimized3.36",
-            optional_launch_kwargs: Optional[dict] = None,
-            wait: bool = True,
-        ) -> list[OciInstance]:
+        self,
+        image_id: str,
+        instance_count: int = 2,
+        instance_type: str = "BM.Optimized3.36",
+        optional_launch_kwargs: Optional[dict] = None,
+        wait: bool = True,
+    ) -> list[OciInstance]:
         """
         Create a compute cluster with a specified number of instances.
 
         Args:
             instance_count: Number of instances to create
             launch_kwargs: Additional arguments to pass to the launch method
-        
+
         Returns:
             List of OciInstance objects that were created
         """
-
         # create an empty compute cluster
         cluster_id = self._init_empty_cluster()
 
         # create a list to store the instances that are created
         instances: list[OciInstance] = []
 
-        # if image id or instance type are provided in the optional launch kwargs, pop 
+        # if image id or instance type are provided in the optional launch kwargs, pop
         # them out and use them instead of the default values
         if optional_launch_kwargs:
             image_id = optional_launch_kwargs.pop("image_id", image_id)
@@ -447,4 +446,3 @@ class OCI(BaseCloud):
             )
         )
         return create_compute_cluster_response.data.id
-
