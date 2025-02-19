@@ -19,7 +19,13 @@ from pycloudlib.errors import (
     PycloudlibException,
 )
 from pycloudlib.oci.instance import OciInstance
-from pycloudlib.oci.utils import get_subnet_id, parse_oci_config_from_env_vars, wait_till_ready
+from pycloudlib.oci.utils import (
+    generate_create_vnic_details,
+    get_subnet_id,
+    parse_oci_config_from_env_vars,
+    wait_till_ready,
+)
+from pycloudlib.types import NetworkingConfig
 from pycloudlib.util import UBUNTU_RELEASE_VERSION_MAP, subp
 
 
@@ -257,8 +263,9 @@ class OCI(BaseCloud):
         retry_strategy=None,
         username: Optional[str] = None,
         cluster_id: Optional[str] = None,
+        primary_network_config: Optional[NetworkingConfig] = None,
         **kwargs,
-    ) -> OciInstance:
+    ) -> OciInstance:  # pylint: disable-msg=too-many-locals
         """Launch an instance.
 
         Args:
@@ -272,6 +279,8 @@ class OCI(BaseCloud):
             username: username to use when connecting via SSH
             vcn_name: Name of the VCN to use. If not provided, the first VCN
                 found will be used
+            primary_network_config: NetworkingConfig object to use for configuring the primary
+                network interface
             **kwargs: dictionary of other arguments to pass as
                 LaunchInstanceDetails
 
@@ -286,6 +295,7 @@ class OCI(BaseCloud):
             self.compartment_id,
             self.availability_domain,
             vcn_name=self.vcn_name,
+            networking_config=primary_network_config,
         )
         metadata = {
             "ssh_authorized_keys": self.key_pair.public_key_content,
@@ -303,6 +313,10 @@ class OCI(BaseCloud):
             image_id=image_id,
             metadata=metadata,
             compute_cluster_id=cluster_id,
+            create_vnic_details=generate_create_vnic_details(
+                subnet_id=subnet_id,
+                networking_config=primary_network_config,
+            ),
             **kwargs,
         )
 
@@ -316,6 +330,28 @@ class OCI(BaseCloud):
         )
         self.created_instances.append(instance)
         return instance
+
+    def find_compatible_subnet(self, networking_config: NetworkingConfig) -> str:
+        """
+        Find a subnet that is compatible with the networking_config.
+
+        Args:
+            networking_config: NetworkingConfig object to use for finding a subnet
+
+        Returns:
+            id of the subnet selected
+        Raises:
+            `Exception` if unable to determine `subnet_id` for
+            `availability_domain`
+        """
+        subnet_id = get_subnet_id(
+            self.network_client,
+            self.compartment_id,
+            self.availability_domain,
+            vcn_name=self.vcn_name,
+            networking_config=networking_config,
+        )
+        return subnet_id
 
     def snapshot(self, instance, clean=True, name=None):
         """Snapshot an instance and generate an image from it.
