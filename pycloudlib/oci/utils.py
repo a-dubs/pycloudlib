@@ -111,7 +111,7 @@ def _get_subnet_features(
         networking_type = NetworkingType.DUAL_STACK
     else:
         log.warning(
-            "Unable to determine networking type for subnet %s [%s]",
+            "Unable to determine networking type for subnet %s [id: %s]",
             subnet.display_name,
             subnet.id,
         )
@@ -161,11 +161,28 @@ def _subnet_is_compatible(
     # to do this, lets get the subnet features
     features = _get_subnet_features(subnet)
     log.info("Subnet features: %s", features)
-    networking_type_compatible = (
-        networking_type is None
-        or networking_type == NetworkingType.AUTO
-        or networking_type == features["networking_type"]
-    )
+    # networking_type_compatible = (
+    #     networking_type is None
+    #     or networking_type == NetworkingType.AUTO
+    #     or networking_type == features["networking_type"]
+    # )
+
+    if networking_type == NetworkingType.IPV4:
+        networking_type_compatible = (
+            features["networking_type"] == NetworkingType.IPV4
+            or features["networking_type"] == NetworkingType.DUAL_STACK
+        )
+    elif networking_type == NetworkingType.IPV6:
+        networking_type_compatible = (
+            features["networking_type"] == NetworkingType.IPV6
+        )
+    elif networking_type == NetworkingType.DUAL_STACK:
+        networking_type_compatible = (
+            features["networking_type"] == NetworkingType.DUAL_STACK
+        )
+    else:  # networking type is AUTO or None
+        networking_type_compatible = True
+
     private_compatible = private == features["private"]
     availability_domain_compatible = (
         features["availability_domain"] is None
@@ -254,13 +271,14 @@ def get_subnet_id(
     ).data
     subnet_id = None
     for subnet in subnets:
-        log.info("Subnet data: %s", subnet)
+        log.debug("Subnet data: %s", subnet)
         if _subnet_is_compatible(
             subnet=subnet,
             availability_domain=availability_domain,
             networking_config=networking_config,
         ):
             subnet_id = subnet.id
+            log.info("Using subnet %s [id: %s]", subnet.display_name, subnet.id)
             break
     if not subnet_id:
         raise PycloudlibError(f"Unable to find suitable subnet in VCN {chosen_vcn_name}")

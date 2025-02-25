@@ -16,7 +16,7 @@ from pycloudlib.oci.utils import (
     get_subnet_id_by_name,
     wait_till_ready,
 )
-from pycloudlib.types import NetworkingConfig
+from pycloudlib.types import NetworkingConfig, NetworkingType
 
 
 class OciInstance(BaseInstance):
@@ -33,6 +33,7 @@ class OciInstance(BaseInstance):
         oci_config=None,
         *,
         username: Optional[str] = None,
+        vcn_name: Optional[str] = None,
     ):
         """Set up the instance.
 
@@ -52,6 +53,7 @@ class OciInstance(BaseInstance):
         self.availability_domain = availability_domain
         self._fault_domain = None
         self._ip = None
+        self._vcn_name: Optional[str] = vcn_name
 
         if oci_config is None:
             oci_config = oci.config.from_file("~/.oci/config")  # noqa: E501
@@ -151,7 +153,11 @@ class OciInstance(BaseInstance):
             for vnic_attachment in vnic_attachments
         ]
         secondary_vnic_attachment = [vnic for vnic in vnics if not vnic.is_primary][0]
-        return secondary_vnic_attachment.private_ip
+        self._log.debug("secondary vnic attachment data:\n%s", secondary_vnic_attachment)
+        return (
+            secondary_vnic_attachment.private_ip
+            or secondary_vnic_attachment.ipv6_addresses[0]
+        )
 
     @property
     def instance_data(self):
@@ -297,6 +303,7 @@ class OciInstance(BaseInstance):
                 self.compartment_id,
                 self.availability_domain,
                 networking_config=networking_config,
+                vcn_name=self._vcn_name,
             )
         create_vnic_details = generate_create_vnic_details(
             subnet_id=subnet_id, networking_config=networking_config
@@ -313,13 +320,22 @@ class OciInstance(BaseInstance):
             desired_state=vnic_attachment_data.LIFECYCLE_STATE_ATTACHED,
         )
         vnic_data = self.network_client.get_vnic(vnic_attachment_data.vnic_id).data
-        self._log.info(
-            "Added network interface with private IP %s to instance %s on nic #%s",
-            vnic_data.private_ip,
-            self.instance_id,
-            nic_index,
-        )
-        return vnic_data.private_ip
+        self._log.debug("Newly attached vnic data:\n%s", vnic_data,)
+        if networking_config and networking_config.networking_type == NetworkingType.IPV6:
+            self._log.info(
+                "Added network interface with IP %s to instance %s on nic #%s",
+                vnic_data.ipv6_addresses[0],
+                self.instance_id,
+                nic_index,
+            )
+        else:
+            self._log.info(
+                "Added network interface with private IP %s to instance %s on nic #%s",
+                vnic_data.private_ip,
+                self.instance_id,
+                nic_index,
+            )
+            return vnic_data.private_ip
 
     def remove_network_interface(self, ip_address: str):
         """Remove network interface based on IP address.
@@ -364,14 +380,20 @@ class OciInstance(BaseInstance):
                         or if the IP address was not successfully assigned to the interface.
             PycloudlibError: If failed to fetch secondary VNIC data from the Oracle Cloud metadata service.
         """
-        if not self.secondary_vnic_private_ip:
+        secondary_ip = self.secondary_vnic_private_ip
+        if not secondary_ip:
             raise ValueError("Cannot configure secondary VNIC without a secondary VNIC attached")
+        if ":" in secondary_ip:
+            imds_url = "http://[fd00:c1::a9fe:a9fe]/opc/v1/vnics"
+        else:
+            imds_url = "http://169.254.169.254/opc/v1/vnics"
+
         secondary_vnic_imds_data: Optional[Dict[str, str]] = None
         # it can take a bit for the secondary VNIC to show up in the IMDS
         # so we need to retry fetching the data for roughly a minute
         for _ in range(60):
             # Fetch JSON data from the Oracle Cloud metadata service
-            imds_req = self.execute("curl -s http://169.254.169.254/opc/v1/vnics").stdout
+            imds_req = self.execute(f"curl -s {imds_url}").stdout
             vnics_data = json.loads(imds_req)
             if len(vnics_data) > 1:
                 self._log.debug("Successfully fetched secondary VNIC data from IMDS")

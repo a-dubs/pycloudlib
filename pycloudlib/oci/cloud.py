@@ -252,6 +252,7 @@ class OCI(BaseCloud):
             availability_domain=self.availability_domain,
             oci_config=self.oci_config,
             username=username,
+            vcn_name=self.vcn_name,
         )
 
     def launch(
