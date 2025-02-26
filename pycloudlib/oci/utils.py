@@ -18,9 +18,11 @@ log = logging.getLogger(__name__)
 OCI_SDK_NULL = "<null>"
 ORACLE_IMDS_NULL = "\u003cnull\u003e"
 
+
 def _oci_sdk_string_is_truthy(value: Optional[str]) -> bool:
     """Check if value returned by OCI SDK is truthy."""
     return value not in (OCI_SDK_NULL, ORACLE_IMDS_NULL, None, "")
+
 
 def wait_till_ready(
     func,
