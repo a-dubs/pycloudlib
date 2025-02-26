@@ -111,11 +111,11 @@ class TestOracleLaunch:
             instance_type (str): OCI instance type to launch.
 
         Test Steps:
-            1. Launch an instance with the specified primary networking configuration and 
+            1. Launch an instance with the specified primary networking configuration and
                 instance type
             2. Add a secondary network interface with the specified secondary networking
                 configuration
-            3. Restart the instance to apply the changes (As of 20250226 cloud-init does not support 
+            3. Restart the instance to apply the changes (As of 20250226 cloud-init does not support
                 hotplugging nics on Oracle)
             4. Verify that the instance has the expected number of VNICs in IMDS
         """
