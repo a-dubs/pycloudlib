@@ -4,10 +4,11 @@ from pycloudlib.types import NetworkingConfig
 import pytest
 import re
 
+
 def test_networking_config_post_init_raises_exceptions():
     """Test NetworkingConfig post init checks."""
     with pytest.raises(
-        ValueError, 
+        ValueError,
         match="Invalid networking type provided",
     ):
         NetworkingConfig(networking_type="invalid")
