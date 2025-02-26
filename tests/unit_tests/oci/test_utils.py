@@ -139,7 +139,9 @@ class TestGetSubnetId:
         assert result == "subnet_id"
         # Ensure that list_subnets is called with the first VCN's ID, not the second
         network_client.list_subnets.assert_called_with(
-            compartment_id, vcn_id="vcn1_id", retry_strategy=DEFAULT_RETRY_STRATEGY
+            compartment_id=compartment_id,
+            vcn_id="vcn1_id",
+            retry_strategy=DEFAULT_RETRY_STRATEGY,
         )
 
     def test_get_subnet_id_suceeds_with_vcn_name(self, setup_environment):
@@ -163,7 +165,7 @@ class TestGetSubnetId:
         assert result == "subnet_id"
         # Ensure that list_subnets is called with the specified VCN's ID
         network_client.list_subnets.assert_called_with(
-            compartment_id,
+            compartment_id=compartment_id,
             vcn_id="vcn_id",
             retry_strategy=DEFAULT_RETRY_STRATEGY,
         )

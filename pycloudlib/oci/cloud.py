@@ -266,7 +266,7 @@ class OCI(BaseCloud):
         cluster_id: Optional[str] = None,
         primary_network_config: Optional[NetworkingConfig] = None,
         **kwargs,
-    ) -> OciInstance:  # pylint: disable-msg=too-many-locals
+    ) -> OciInstance:
         """Launch an instance.
 
         Args:
@@ -334,16 +334,20 @@ class OCI(BaseCloud):
 
     def find_compatible_subnet(self, networking_config: NetworkingConfig) -> str:
         """
-        Find a subnet that is compatible with the networking_config.
+        Automatically select a subnet that is compatible with the given networking_config.
+
+        In this case, compatible means that the subnet can support the necessary networking type
+        (ipv4 only, ipv6 only, or dual stack) and the private or public requirement.
+        This method will select the first subnet that matches the criteria.
 
         Args:
             networking_config: NetworkingConfig object to use for finding a subnet
 
         Returns:
             id of the subnet selected
+
         Raises:
-            `Exception` if unable to determine `subnet_id` for
-            `availability_domain`
+            `PycloudlibError` if unable to determine `subnet_id` for the given `networking_config`
         """
         subnet_id = get_subnet_id(
             self.network_client,

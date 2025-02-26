@@ -16,7 +16,7 @@ from pycloudlib.oci.utils import (
     get_subnet_id_by_name,
     wait_till_ready,
 )
-from pycloudlib.types import NetworkingConfig, NetworkingType
+from pycloudlib.types import NetworkingConfig
 
 
 class OciInstance(BaseInstance):
@@ -154,10 +154,7 @@ class OciInstance(BaseInstance):
         ]
         secondary_vnic_attachment = [vnic for vnic in vnics if not vnic.is_primary][0]
         self._log.debug("secondary vnic attachment data:\n%s", secondary_vnic_attachment)
-        return (
-            secondary_vnic_attachment.private_ip
-            or secondary_vnic_attachment.ipv6_addresses[0]
-        )
+        return secondary_vnic_attachment.private_ip or secondary_vnic_attachment.ipv6_addresses[0]
 
     @property
     def instance_data(self):
@@ -282,12 +279,12 @@ class OciInstance(BaseInstance):
 
         Args:
             nic_index: The index of the NIC to add
-            subnet_name: Name of the subnet to add the NIC to. If provided, this subnet will
-                blindly be selected and networking_config will be ignored.
             networking_config: Networking configuration to use when selecting subnet. This specifies
                 the networking type (ipv4, ipv6, or dualstack) and whether to use a public or
                 private subnet. If not provided, will default to selecting the first public subnet
                 found.
+            subnet_name: Name of the subnet to add the NIC to. If provided, this subnet will
+                blindly be selected and networking_config will be ignored.
         """
         if subnet_name:
             if networking_config:
@@ -320,22 +317,17 @@ class OciInstance(BaseInstance):
             desired_state=vnic_attachment_data.LIFECYCLE_STATE_ATTACHED,
         )
         vnic_data = self.network_client.get_vnic(vnic_attachment_data.vnic_id).data
-        self._log.debug("Newly attached vnic data:\n%s", vnic_data,)
-        if networking_config and networking_config.networking_type == NetworkingType.IPV6:
-            self._log.info(
-                "Added network interface with IP %s to instance %s on nic #%s",
-                vnic_data.ipv6_addresses[0],
-                self.instance_id,
-                nic_index,
-            )
-        else:
-            self._log.info(
-                "Added network interface with private IP %s to instance %s on nic #%s",
-                vnic_data.private_ip,
-                self.instance_id,
-                nic_index,
-            )
-            return vnic_data.private_ip
+        self._log.debug(
+            "Newly attached vnic data:\n%s",
+            vnic_data,
+        )
+        self._log.info(
+            "Added network interface with IP %s to instance %s on nic #%s",
+            vnic_data.private_ip or vnic_data.ipv6_addresses[0],
+            self.instance_id,
+            nic_index,
+        )
+        return vnic_data.private_ip or vnic_data.ipv6_addresses[0]
 
     def remove_network_interface(self, ip_address: str):
         """Remove network interface based on IP address.
