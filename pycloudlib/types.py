@@ -56,6 +56,8 @@ class NetworkingConfig:
         """Post initialization checks for NetworkingConfig."""
         if not isinstance(self.networking_type, NetworkingType):
             raise ValueError("Invalid networking type provided")
+        if not isinstance(self.private, bool):
+            raise ValueError("Invalid private value provided (must be a boolean)")
 
     def to_dict(self) -> dict:
         """Convert the NetworkingConfig to a dictionary representation."""
