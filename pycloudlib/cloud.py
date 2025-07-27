@@ -12,7 +12,7 @@ from typing import Any, List, MutableMapping, Optional, Sequence
 
 import paramiko
 
-from pycloudlib.config import ConfigFile, parse_config
+from pycloudlib.config import ConfigFile, merge_configs, parse_config
 from pycloudlib.errors import (
     CleanupError,
     InvalidTagNameError,
@@ -50,6 +50,7 @@ class BaseCloud(ABC):
         timestamp_suffix: bool = True,
         config_file: Optional[ConfigFile] = None,
         required_values: Optional[_RequiredValues] = None,
+        **constructor_params,
     ):
         """Initialize base cloud class.
 
@@ -57,12 +58,19 @@ class BaseCloud(ABC):
             tag: string used to name and tag resources with
             timestamp_suffix: Append a timestamped suffix to the tag string.
             config_file: path to pycloudlib configuration file
+            required_values: (deprecated) list of required values for compatibility
+            **constructor_params: additional configuration parameters that override TOML settings
         """
         self.created_instances: List[BaseInstance] = []
         self.created_images: List[str] = []
 
         self._log = logging.getLogger("{}.{}".format(__name__, self.__class__.__name__))
-        self.config = self._check_and_get_config(config_file, required_values)
+        
+        # Filter out standard BaseCloud parameters from constructor_params
+        standard_params = {"tag", "timestamp_suffix", "config_file", "required_values"}
+        filtered_params = {k: v for k, v in constructor_params.items() if k not in standard_params}
+        
+        self.config = self._check_and_get_config(config_file, required_values, filtered_params)
 
         self.tag = get_timestamped_tag(tag) if timestamp_suffix else tag
         self._validate_tag(self.tag)
@@ -266,25 +274,40 @@ class BaseCloud(ABC):
         self,
         config_file: Optional[ConfigFile],
         required_values: _RequiredValues,
+        constructor_params: Optional[MutableMapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
         """Set pycloudlib configuration.
 
-        Checks if values required to launch a cloud instance are present.
-        Values should be present in pycloudlib config file or passed to the
-        cloud's constructor directly.
+        Always loads the TOML configuration file if available, then merges with
+        constructor parameters. Constructor parameters override TOML settings.
 
         Args:
             config_file: path to pycloudlib configuration file
             required_values: a list containing all the required values for
-                the cloud that were passed to the cloud's constructor
+                the cloud that were passed to the cloud's constructor (kept for compatibility)
+            constructor_params: dictionary of parameters passed to the constructor
+
+        Returns:
+            Merged configuration dictionary
         """
-        # if all required values were passed to the cloud's constructor,
-        # there is no need to parse the config file. If some (but not all)
-        # of them were provided, config file is loaded and the values that
-        # were passed in work as overrides
-        if required_values and all(v is not None for v in required_values):
-            return {}
-        return parse_config(config_file)[self._type]
+        # Always try to parse the config file first
+        try:
+            full_config = parse_config(config_file, validate=True, cloud_type=self._type)
+            base_config = full_config.get(self._type, {})
+        except ValueError as e:
+            # If no config file is found, check if we have sufficient constructor params
+            if constructor_params or (required_values and all(v is not None for v in required_values)):
+                self._log.debug("No config file found, using constructor parameters only")
+                base_config = {}
+            else:
+                # Re-raise the error if we don't have sufficient parameters
+                raise
+        
+        # Merge constructor parameters if provided
+        if constructor_params:
+            return merge_configs(base_config, constructor_params)
+        
+        return base_config
 
     @staticmethod
     def _validate_tag(tag: str):

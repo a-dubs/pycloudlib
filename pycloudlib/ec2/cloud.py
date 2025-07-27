@@ -54,6 +54,10 @@ class EC2(BaseCloud):
             timestamp_suffix,
             config_file,
             required_values=[access_key_id, secret_access_key, region],
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region=region,
+            profile=profile,
         )
         self._log.debug("logging into EC2")
 
