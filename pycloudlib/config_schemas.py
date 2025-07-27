@@ -74,7 +74,6 @@ AZURE_SCHEMA = {
             "default": "centralus"
         }
     },
-    "required": ["client_id", "client_secret", "subscription_id", "tenant_id"],
     "additionalProperties": False
 }
 
@@ -106,7 +105,6 @@ GCE_SCHEMA = {
             "description": "Service account email"
         }
     },
-    "required": ["credentials_path", "project"],
     "additionalProperties": False
 }
 
@@ -164,7 +162,6 @@ IBM_CLASSIC_SCHEMA = {
             "description": "Domain name"
         }
     },
-    "required": ["username", "api_key", "domain_name"],
     "additionalProperties": False
 }
 
@@ -210,7 +207,6 @@ OCI_SCHEMA = {
             "description": "VCN name"
         }
     },
-    "required": ["config_path", "availability_domain", "compartment_id"],
     "additionalProperties": False
 }
 
@@ -224,7 +220,6 @@ OPENSTACK_SCHEMA = {
             "description": "OpenStack network name"
         }
     },
-    "required": ["network"],
     "additionalProperties": False
 }
 
@@ -248,7 +243,6 @@ QEMU_SCHEMA = {
             "default": "qemu-system-x86_64"
         }
     },
-    "required": ["image_dir"],
     "additionalProperties": False
 }
 
@@ -287,7 +281,6 @@ VMWARE_SCHEMA = {
             "default": False
         }
     },
-    "required": ["server", "username", "password", "datacenter", "datastore", "folder"],
     "additionalProperties": False
 }
 

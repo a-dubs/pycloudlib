@@ -139,6 +139,13 @@ class Azure(BaseCloud):
                 subscription_id,
                 tenant_id,
             ],
+            client_id=client_id,
+            client_secret=client_secret,
+            subscription_id=subscription_id,
+            tenant_id=tenant_id,
+            region=region,
+            username=username,
+            enable_boot_diagnostics=enable_boot_diagnostics,
         )
 
         self.created_resource_groups: List = []

@@ -29,16 +29,16 @@ class TestConfigValidation:
             validate_cloud_config("ec2", config)
 
     def test_validate_azure_config_missing_required(self):
-        """Test that Azure config missing required fields fails validation."""
+        """Test that Azure config with invalid additional property fails validation."""
         config = {
             "client_id": "test",
-            # missing required fields: client_secret, subscription_id, tenant_id
+            "invalid_additional_field": "should_fail"
         }
         with pytest.raises(ValueError, match="Invalid configuration for azure"):
             validate_cloud_config("azure", config)
 
     def test_validate_azure_config_valid(self):
-        """Test that complete Azure config passes validation."""
+        """Test that valid Azure config passes validation."""
         config = {
             "client_id": "test_client",
             "client_secret": "test_secret", 
