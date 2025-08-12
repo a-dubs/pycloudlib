@@ -6,6 +6,7 @@ import base64
 import json
 import os
 import re
+import ipaddress
 from typing import Dict, List, Optional, cast
 
 import oci
@@ -26,7 +27,7 @@ from pycloudlib.oci.utils import (
     parse_oci_config_from_env_vars,
     wait_till_ready,
 )
-from pycloudlib.types import NetworkingConfig
+from pycloudlib.types import NetworkingConfig, NetworkingType
 from pycloudlib.util import UBUNTU_RELEASE_VERSION_MAP, subp
 
 
@@ -490,3 +491,138 @@ class OCI(BaseCloud):
             )
         )
         return create_compute_cluster_response.data.id
+
+    def create_subnet_in_vcn(
+        self,
+        vcn_name: str,
+        networking_config: NetworkingConfig,
+        subnet_name: Optional[str] = None,
+    ) -> str:
+        """
+        Create a subnet in the given VCN using the networking_config and return the subnet id.
+        """
+        if not isinstance(networking_config, NetworkingConfig):
+            raise PycloudlibException("Invalid networking_config provided")
+
+        # Find the target VCN by name (must be unique)
+        vcns = self.network_client.list_vcns(
+            self.compartment_id, display_name=vcn_name
+        ).data
+        if len(vcns) == 0:
+            raise PycloudlibException(f"Unable to determine vcn name: {vcn_name}")
+        if len(vcns) > 1:
+            raise PycloudlibException(f"Found multiple vcns with name: {vcn_name}")
+        vcn = vcns[0]
+
+        # Collect existing subnets to avoid CIDR overlap and to compute a unique name
+        existing_subnets = self.network_client.list_subnets(
+            compartment_id=self.compartment_id, vcn_id=vcn.id
+        ).data
+
+        used_ipv4_networks: List[ipaddress.IPv4Network] = []
+        used_ipv6_networks: List[ipaddress.IPv6Network] = []
+        for subnet in existing_subnets:
+            # ipv4
+            cidr_v4 = getattr(subnet, "cidr_block", None)
+            if cidr_v4:
+                try:
+                    used_ipv4_networks.append(ipaddress.ip_network(cidr_v4, strict=False))
+                except ValueError:
+                    pass
+            # ipv6
+            cidr_v6 = getattr(subnet, "ipv6_cidr_block", None)
+            if cidr_v6:
+                try:
+                    used_ipv6_networks.append(ipaddress.ip_network(cidr_v6, strict=False))
+                except ValueError:
+                    pass
+
+        # Determine parent VCN blocks
+        vcn_ipv4_parents: List[str] = []
+        if getattr(vcn, "cidr_blocks", None):
+            vcn_ipv4_parents = list(vcn.cidr_blocks)
+        elif getattr(vcn, "cidr_block", None):
+            vcn_ipv4_parents = [vcn.cidr_block]
+
+        vcn_ipv6_parents: List[str] = []
+        if getattr(vcn, "ipv6_cidr_blocks", None):
+            vcn_ipv6_parents = list(vcn.ipv6_cidr_blocks)
+        elif getattr(vcn, "ipv6_cidr_block", None):
+            vcn_ipv6_parents = [vcn.ipv6_cidr_block]
+
+        def pick_unused_subnet(parent_cidrs: List[str], used: List[ipaddress._BaseNetwork], new_prefixlen: int) -> Optional[str]:
+            for parent in parent_cidrs:
+                try:
+                    parent_net = ipaddress.ip_network(parent, strict=False)
+                except ValueError:
+                    continue
+                try:
+                    for candidate in parent_net.subnets(new_prefix=new_prefixlen):
+                        if all(not candidate.overlaps(used_net) for used_net in used):
+                            return str(candidate)
+                except ValueError:
+                    # parent is smaller than requested prefix, allow exact match if unused
+                    if all(not parent_net.overlaps(used_net) for used_net in used):
+                        return str(parent_net)
+            return None
+
+        def generate_unique_display_name() -> str:
+            networking_label = networking_config.networking_type.value
+            privacy_label = "private" if networking_config.private else "public"
+            base_name = f"subnet-{networking_label}-{privacy_label}-{self.tag}"
+            # ensure uniqueness by appending -001, -002, ...
+            existing_names = {getattr(s, "display_name", "") for s in existing_subnets}
+            index = 1
+            while True:
+                candidate = f"{base_name}-{index:03d}"
+                if candidate not in existing_names:
+                    return candidate
+                index += 1
+
+        # Build CreateSubnetDetails parameters
+        create_kwargs: Dict[str, object] = {
+            "compartment_id": self.compartment_id,
+            "vcn_id": vcn.id,
+            # Omit availability_domain to make this subnet regional per OCI recommendation
+            "display_name": subnet_name or generate_unique_display_name(),
+        }
+
+        involves_ipv6 = networking_config.networking_type in (NetworkingType.IPV6, NetworkingType.DUAL_STACK)
+        involves_ipv4 = networking_config.networking_type in (NetworkingType.IPV4, NetworkingType.DUAL_STACK)
+
+        # Select IPv4 subnet if needed
+        if involves_ipv4:
+            if not vcn_ipv4_parents:
+                raise PycloudlibException("VCN does not have IPv4 CIDR blocks to create an IPv4/dual-stack subnet")
+            ipv4_cidr = pick_unused_subnet(vcn_ipv4_parents, used_ipv4_networks, new_prefixlen=24)
+            if not ipv4_cidr:
+                raise PycloudlibException("Unable to find an available IPv4 /24 within the VCN for the subnet")
+            create_kwargs["cidr_block"] = ipv4_cidr
+
+        # Select IPv6 subnet if needed
+        if involves_ipv6:
+            if not vcn_ipv6_parents:
+                raise PycloudlibException("VCN is not IPv6-enabled or has no IPv6 CIDR blocks for IPv6/dual-stack subnet")
+            ipv6_cidr = pick_unused_subnet(vcn_ipv6_parents, used_ipv6_networks, new_prefixlen=64)
+            if not ipv6_cidr:
+                raise PycloudlibException("Unable to find an available IPv6 /64 within the VCN for the subnet")
+            # Prefer the singular field which is widely supported
+            create_kwargs["ipv6_cidr_block"] = ipv6_cidr
+
+        # Configure privacy/ingress flags
+        if involves_ipv6:
+            # For IPv6 or dual-stack, use prohibit_internet_ingress to enforce privacy across IPv6 (and IPv4 by propagation)
+            create_kwargs["prohibit_internet_ingress"] = bool(networking_config.private)
+        else:
+            # For IPv4-only, use prohibit_public_ip_on_vnic
+            create_kwargs["prohibit_public_ip_on_vnic"] = bool(networking_config.private)
+
+        # Create the subnet
+        details = oci.core.models.CreateSubnetDetails(**create_kwargs)
+        created_subnet = self.network_client.create_subnet(details).data
+
+        # Wait until the subnet is AVAILABLE before returning
+        ready_subnet = wait_till_ready(
+            func=self.network_client.get_subnet, current_data=created_subnet, desired_state="AVAILABLE"
+        )
+        return ready_subnet.id
