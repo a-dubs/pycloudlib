@@ -6,9 +6,16 @@
 # After you complete this file, DO NOT CHECK IT INTO VERSION CONTROL
 # It you have a secret manager like lastpass, it should go there
 #
+# NEW in v1.11+: Enhanced Configuration System
+# - Any setting in this file can also be passed as a constructor parameter
+# - Constructor parameters override TOML settings (TOML serves as base config)
+# - SSH keys can now be configured at runtime via constructor parameters
+# - TOML validation catches configuration errors immediately
+# - See demo_new_config_system.py for examples
+#
 # If a key is uncommented, it is required to launch an instance on that cloud.
 # Commented keys aren't required, but allow further customization for
-# settings in which the defaults don't work for you. If a key has a value,
+# settings in which the defaults don't work for you. If a value has a value,
 # that represents the default for that cloud.
 ##############################################################################
 
